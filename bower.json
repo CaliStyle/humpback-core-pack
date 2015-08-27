@@ -1,0 +1,21 @@
+{
+  "name": "humpback-core-pack",
+  "version": "0.11.0",
+  "authors": [
+    "Scott Wyatt <scottwyatt86@gmail.com>"
+  ],
+  "description": "Humpback Core Frontend Components",
+  "main": "index.js",
+  "keywords": [
+    "Humpback",
+    "frontend"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ]
+}
