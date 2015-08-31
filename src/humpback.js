@@ -15,12 +15,119 @@ angular.module('humpback.core', [
   'ui.ace',
   'ngSanitize',
 
+  'humpback.core.cms',
   'humpback.core.users',
   'humpback.core.routes',
   'humpback.core.models',
   'humpback.core.settings'
 ]);
 
+angular.module('humpback.core.cms', [])
+.factory('CMS', function($document, $rootElement) {
+  
+  var CMS = function(){
+    this.suffix = " | " + window._name;
+    this.title = '';
+    this.description = '';
+    this.keywords = '';
+    this.image = '';
+    this.url = '';
+    this.siteName = '';
+    this.locale = window._locale;
+  };
+ 
+  CMS.prototype.setSuffix = function(s) {
+    return this.suffix = s;
+  }
+
+  CMS.prototype.getSuffix = function() {
+    return this.suffix;
+  }
+
+  CMS.prototype.setTitle = function(t) {
+    if (this.suffix !== "") {
+      this.title = t + this.suffix;
+    } else {
+      this.title = t;
+    }
+
+    var meta = angular.element(document.querySelectorAll('meta[property="og:title"]'));
+    meta.attr('content', this.title);
+
+    return $document.prop('title', this.title);
+  }
+
+  CMS.prototype.getTitle = function() {
+    return $document.prop('title');
+  }
+
+  CMS.prototype.setDescription = function(d) {
+    this.description = d;
+    var meta = angular.element(document.querySelectorAll('meta[name="description"]'));
+    return meta.attr('content', this.description);
+  }
+
+  CMS.prototype.getDescription = function() {
+    return angular.element(document.querySelectorAll('meta[name="description"]'));
+  }
+
+  CMS.prototype.setKeywords = function(k) {
+    if(_.isObject(k)){
+      this.keywords = _.pluck(k, 'text').join(',');
+    }else{
+      this.keywords = k;
+    }
+    
+    var meta = angular.element(document.querySelectorAll('meta[name="keywords"]'));
+    return meta.attr('content', this.keywords);
+  }
+
+  CMS.prototype.getKeywords = function() {
+    return angular.element(document.querySelectorAll('meta[name="keywords"]'));
+  }
+
+  CMS.prototype.setImage = function(i) {
+    this.image = i;
+    var meta = angular.element(document.querySelectorAll('meta[property="og:image"]'));
+    return meta.attr('content', this.image);
+  }
+
+  CMS.prototype.getImage = function() {
+    return angular.element(document.querySelectorAll('meta[property="og:image"]'));
+  }
+
+  CMS.prototype.setUrl = function(u) {
+    this.url = u;
+    var meta = angular.element(document.querySelectorAll('meta[property="og:url"]'));
+    return meta.attr('content', this.url);
+  }
+
+  CMS.prototype.getUrl = function() {
+    return angular.element(document.querySelectorAll('meta[property="og:url"]'));
+  }
+
+  CMS.prototype.setSiteName = function(s) {
+    this.siteName = s;
+    var meta = angular.element(document.querySelectorAll('meta[property="og:site_name"]'));
+    return meta.attr('content', this.siteName);
+  }
+
+  CMS.prototype.getSiteName = function() {
+    return angular.element(document.querySelectorAll('meta[property="og:site_name"]'));
+  }
+
+  CMS.prototype.setLocale = function(l) {
+    this.locale = l;
+    var meta = angular.element(document.querySelectorAll('meta[property="og:locale"]'));
+    return meta.attr('content', this.locale);
+  }
+
+  CMS.prototype.getLocale = function() {
+    return angular.element(document.querySelectorAll('meta[property="og:locale"]'));
+  }
+
+  return CMS;
+});
 
 angular.module('humpback.core.users', [])
 
@@ -37,6 +144,8 @@ angular.module('humpback.core.users', [])
     this.end = 10;
     this.criteria = '';
     this.sort = 'createdAt desc';
+    this.error = null;
+    this.message = null;
   };
   
   Users.prototype.count = function() {
@@ -64,12 +173,16 @@ angular.module('humpback.core.users', [])
 
       users.users = _.merge(users.users, list);
       users.visible = list;
+      users.skip = users.skip + users.limit;
       
-        users.skip = users.skip + users.limit;
-        users.busy = false;
+    })
+    .finally(function () {
+      users.busy = false;
     })
     .catch(function(err){
       if(utils.development()){ console.log(err); }; // reason why query failed
+      users.error = err.status;
+      users.message = err.data;
     });
 
    }
@@ -93,12 +206,16 @@ angular.module('humpback.core.users', [])
 
       users.users = _.merge(users.users, list);
       users.visible = list;
-      
-        users.skip = users.skip + users.limit;
-        users.busy = false;
+      users.skip = users.skip + users.limit;
+        
+    })
+    .finally(function () {
+      users.busy = false;
     })
     .catch(function(err){
       if(utils.development()){ console.log(err); }; // reason why query failed
+      users.error = err.status;
+      users.message = err.data;
     });
 
    }
@@ -120,6 +237,8 @@ angular.module('humpback.core.routes', [])
     this.end = 10;
     this.criteria = '';
     this.sort = 'createdAt desc';
+    this.error = null;
+    this.message = null;
   };
 
   Routes.prototype.prevPage = function() {
@@ -141,12 +260,16 @@ angular.module('humpback.core.routes', [])
 
       routes.routes = _.merge(routes.routes, list);
       routes.visible = list;
-      
-        routes.skip = routes.skip + routes.limit;
-        routes.busy = false;
+      routes.skip = routes.skip + routes.limit;
+
+    })
+    .finally(function () {
+      routes.busy = false;
     })
     .catch(function(err){
       if(utils.development()){ console.log(err); }; // reason why query failed
+      routes.error = err.status;
+      routes.message = err.data;
     });
 
    }
@@ -169,20 +292,126 @@ angular.module('humpback.core.routes', [])
 
       routes.routes = _.merge(routes.routes, list);
       routes.visible = list;
-      
-        routes.skip = routes.skip + routes.limit;
-        routes.busy = false;
+      routes.skip = routes.skip + routes.limit;
+
+    })
+    .finally(function () {
+      routes.busy = false;
     })
     .catch(function(err){
       if(utils.development()){ console.log(err); }; // reason why query failed
+      routes.error = err.status;
+      routes.message = err.data;
     });
 
-   }
+  }
   
   return Routes;
 
 
- });
+})
+
+.factory('Route', function(DS, utils, CMS) {
+
+  var Route = function(id) {
+    this.id = id;
+    this.route = {};
+    this.criteria = '';
+    this.busy = false;
+    this.error = null;
+    this.message = null;
+    this.cms = new CMS();
+    
+  };
+  
+  Route.prototype.create = function() {
+    var route = this;
+    
+    if (route.busy){ 
+      return;
+    }
+    route.busy = true;
+
+  }
+
+  Route.prototype.read = function() {
+    var route = this;
+    if (route.busy){ 
+      return;
+    }
+    route.busy = true;
+
+    DS.find('route', route.id)
+    .then(function(thisroute){
+      
+      console.log(thisroute);
+
+      route.route = thisroute;
+    })
+    .finally(function () {
+      route.busy = false;
+    })
+    .catch(function (err) {
+      if(utils.development()){ console.log(err); }; // reason why query failed
+      route.error = err.status;
+      route.message = err.data;
+    });
+  }
+
+  Route.prototype.get = function(id) {
+    var route = this;
+    route.busy = true;
+
+    DS.find('route', id)
+    .then(function(thisroute){
+      route.route = thisroute;
+
+       route.cms.setTitle(thisroute.title);
+       route.cms.setDescription(thisroute.description);
+       route.cms.setImage(thisroute.image);
+       route.cms.setKeywords(thisroute.keywords);
+
+    })
+    .finally(function () {
+      route.busy = false;
+    })
+    .catch(function (err) {
+      if(utils.development()){ console.log(err); }; // reason why query failed
+      route.error = err.status;
+      route.message = err.data;
+    });
+  }
+  
+
+  Route.prototype.update = function(thisroute) {
+    var route = this;
+    
+    if (route.busy){ 
+      return;
+    }
+    route.busy = true;
+    
+    console.log(route.route);
+    delete thisroute.target;
+
+    DS.update('route', route.id, thisroute)
+    .then(function(updatedRoute){
+      route.route = updatedRoute;
+    })
+    .finally(function () {
+      route.busy = false;
+    })
+    .catch(function(err){
+      if(utils.development()){ console.log(err); }; // reason why query failed
+      route.error = err.status;
+      route.message = err.data;
+    });
+  }
+
+  return Route;
+
+})
+;
 
 angular.module('humpback.core.models', [])
 .factory('Models', function(DS, utils) {
@@ -198,6 +427,9 @@ angular.module('humpback.core.models', [])
     this.end = 10;
     this.criteria = '';
     this.sort = 'createdAt desc';
+    this.error = null;
+    this.message = null;
+
   };
 
   Models.prototype.prevPage = function() {
@@ -219,12 +451,16 @@ angular.module('humpback.core.models', [])
 
       models.models = _.merge(models.models, list);
       models.visible = list;
-      
-        models.skip = models.skip + models.limit;
-        models.busy = false;
+      models.skip = models.skip + models.limit;
+       
+    })
+    .finally(function () {
+      models.busy = false;
     })
     .catch(function(err){
       if(utils.development()){ console.log(err); }; // reason why query failed
+      models.error = err.status;
+      models.message = err.data;
     });
 
    }
@@ -247,12 +483,16 @@ angular.module('humpback.core.models', [])
 
       models.models = _.merge(models.models, list);
       models.visible = list;
-      
-        models.skip = models.skip + models.limit;
-        models.busy = false;
+      models.skip = models.skip + models.limit;
+        
+    })
+    .finally(function () {
+      models.busy = false;
     })
     .catch(function(err){
       if(utils.development()){ console.log(err); }; // reason why query failed
+      models.error = err.status;
+      models.message = err.data;
     });
 
    }

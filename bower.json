@@ -1,6 +1,6 @@
 {
   "name": "humpback-core-pack",
-  "version": "0.11.2",
+  "version": "0.11.3",
   "authors": [
     "Scott Wyatt <scottwyatt86@gmail.com>"
   ],
@@ -8,7 +8,10 @@
   "main": "index.js",
   "keywords": [
     "Humpback",
-    "frontend"
+    "frontend",
+    "humpback-cms-hook",
+    "humpback-gui-hook",
+    "humpback-admin-hook"
   ],
   "license": "MIT",
   "ignore": [
