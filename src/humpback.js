@@ -166,7 +166,7 @@ angular.module('humpback.core.users', [])
     users.start = users.skip;
     users.end = users.skip + users.limit;
 
-    console.log("SKIP:",users.skip,"START:",users.start,"END:",users.end);
+    if(utils.development()){ console.log("SKIP:",users.skip,"START:",users.start,"END:",users.end); };
 
     DS.findAll('route', {limit: users.limit, skip: users.skip, sort: users.sort})
     .then(function(list){
@@ -199,7 +199,7 @@ angular.module('humpback.core.users', [])
     users.start = users.skip;
     users.end = users.skip + users.limit;
 
-    console.log("SKIP:",users.skip,"START:",users.start,"END:",users.end);
+    if(utils.development()){ console.log("SKIP:",users.skip,"START:",users.start,"END:",users.end); };
 
     DS.findAll('user', {limit: users.limit, skip: users.skip, sort: users.sort})
     .then(function(list){
@@ -221,7 +221,105 @@ angular.module('humpback.core.users', [])
    }
   
   return Users;
-});
+})
+.factory('User', function(DS, utils) {
+
+  var User = function(id) {
+    this.id = id;
+    this.user = {};
+    this.criteria = '';
+    this.busy = false;
+    this.updating = false;
+    this.error = null;
+    this.message = null;
+    
+  };
+  
+  User.prototype.create = function() {
+    var user = this;
+    
+    if (user.busy){ 
+      return;
+    }
+    user.busy = true;
+
+  }
+
+  User.prototype.read = function() {
+    var user = this;
+    if (user.busy){ 
+      return;
+    }
+    user.busy = true;
+
+    DS.find('user', user.id)
+    .then(function(thisuser){
+      
+      console.log(thisuser);
+
+      user.user = thisuser;
+    })
+    .finally(function () {
+      user.busy = false;
+    })
+    .catch(function (err) {
+      if(utils.development()){ console.log(err); }; // reason why query failed
+      user.error = err.status;
+      user.message = err.data;
+    });
+  }
+
+  User.prototype.get = function(id) {
+    var user = this;
+    user.busy = true;
+
+    DS.find('user', id)
+    .then(function(thisuser){
+      user.user = thisuser;
+
+    })
+    .finally(function () {
+      user.busy = false;
+    })
+    .catch(function (err) {
+      if(utils.development()){ console.log(err); }; // reason why query failed
+      user.error = err.status;
+      user.message = err.data;
+    });
+  }
+  
+
+  User.prototype.update = function(thisroute) {
+    var user = this;
+    
+    if (user.busy || user.updating){ 
+      return;
+    }
+    user.busy = true;
+    user.updating = true;
+    
+    console.log(user.user);
+
+    DS.update('user', user.id, thisuser)
+    .then(function(updatedUser){
+      user.user = updatedUser;
+    })
+    .finally(function () {
+      user.busy = false;
+      user.updating = false;
+    })
+    .catch(function(err){
+      if(utils.development()){ console.log(err); }; // reason why query failed
+      user.error = err.status;
+      user.message = err.data;
+    });
+  }
+
+  return User;
+
+})
+
+;
 
 angular.module('humpback.core.routes', [])
 .factory('Routes', function(DS, utils) {
@@ -253,7 +351,7 @@ angular.module('humpback.core.routes', [])
     routes.start = routes.skip;
     routes.end = routes.skip + routes.limit;
 
-    console.log("SKIP:",routes.skip,"START:",routes.start,"END:",routes.end);
+    if(utils.development()){ console.log("SKIP:",routes.skip,"START:",routes.start,"END:",routes.end); };
 
     DS.findAll('route', {limit: routes.limit, skip: routes.skip, sort: routes.sort})
     .then(function(list){
@@ -285,7 +383,7 @@ angular.module('humpback.core.routes', [])
     routes.start = routes.skip;
     routes.end = routes.skip + routes.limit;
 
-    console.log("SKIP:",routes.skip,"START:",routes.start,"END:",routes.end);
+    if(utils.development()){ console.log("SKIP:",routes.skip,"START:",routes.start,"END:",routes.end); };
 
     DS.findAll('route', {limit: routes.limit, skip: routes.skip, sort: routes.sort})
     .then(function(list){
@@ -318,6 +416,7 @@ angular.module('humpback.core.routes', [])
     this.route = {};
     this.criteria = '';
     this.busy = false;
+    this.updating = false;
     this.error = null;
     this.message = null;
     this.cms = new CMS();
@@ -386,10 +485,11 @@ angular.module('humpback.core.routes', [])
   Route.prototype.update = function(thisroute) {
     var route = this;
     
-    if (route.busy){ 
+    if (route.busy || route.updating){ 
       return;
     }
     route.busy = true;
+    route.updating = true;
     
     console.log(route.route);
     delete thisroute.target;
@@ -400,6 +500,7 @@ angular.module('humpback.core.routes', [])
     })
     .finally(function () {
       route.busy = false;
+      route.updating = false;
     })
     .catch(function(err){
       if(utils.development()){ console.log(err); }; // reason why query failed
@@ -444,7 +545,7 @@ angular.module('humpback.core.models', [])
     models.start = models.skip;
     models.end = models.skip + models.limit;
 
-    console.log("SKIP:",models.skip,"START:",models.start,"END:",models.end);
+    if(utils.development()){ console.log("SKIP:",models.skip,"START:",models.start,"END:",models.end); };
 
     DS.findAll('model', {limit: models.limit, skip: models.skip, sort: models.sort})
     .then(function(list){
@@ -463,7 +564,7 @@ angular.module('humpback.core.models', [])
       models.message = err.data;
     });
 
-   }
+  }
 
   Models.prototype.nextPage = function() {
     var models = this;
@@ -476,7 +577,7 @@ angular.module('humpback.core.models', [])
     models.start = models.skip;
     models.end = models.skip + models.limit;
 
-    console.log("SKIP:",models.skip,"START:",models.start,"END:",models.end);
+    if(utils.development()){ console.log("SKIP:",models.skip,"START:",models.start,"END:",models.end); };
 
     DS.findAll('model', {limit: models.limit, skip: models.skip, sort: models.sort})
     .then(function(list){
@@ -495,7 +596,7 @@ angular.module('humpback.core.models', [])
       models.message = err.data;
     });
 
-   }
+  }
   
   return Models;
 
@@ -503,5 +604,91 @@ angular.module('humpback.core.models', [])
  });
 
 angular.module('humpback.core.settings', [])
+.factory('Settings', function(DS, utils) {
+  
+  var Settings = function() {
+    this.visible = [];
+    this.settings = [];
+    this.busy = false;
+    this.skip = 0;
+    this.limit = 10;
+    this.total = 0;
+    this.start = 0;
+    this.end = 10;
+    this.criteria = '';
+    this.sort = 'createdAt desc';
+    this.error = null;
+    this.message = null;
 
+  };
+
+  Settings.prototype.prevPage = function() {
+    var settings = this;
+    
+    if (settings.busy){ 
+      return;
+    }
+    settings.busy = true;
+
+    settings.skip = settings.skip - settings.limit * 2 >= 0 ? settings.skip - settings.limit * 2 : 0;
+    settings.start = settings.skip;
+    settings.end = settings.skip + settings.limit;
+
+    if(utils.development()){ console.log("SKIP:",settings.skip,"START:",settings.start,"END:",settings.end); };
+
+    DS.findAll('setting', {limit: settings.limit, skip: settings.skip, sort: settings.sort})
+    .then(function(list){
+
+      settings.settings = _.merge(settings.settings, list);
+      settings.visible = list;
+      settings.skip = settings.skip + settings.limit;
+       
+    })
+    .finally(function () {
+      settings.busy = false;
+    })
+    .catch(function(err){
+      if(utils.development()){ console.log(err); }; // reason why query failed
+      settings.error = err.status;
+      settings.message = err.data;
+    });
+
+  }
+
+  Settings.prototype.nextPage = function() {
+    var settings = this;
+    
+    if (settings.busy){ 
+      return;
+    }
+    settings.busy = true;
+
+    settings.start = settings.skip;
+    settings.end = settings.skip + settings.limit;
+
+    if(utils.development()){console.log("SKIP:",settings.skip,"START:",settings.start,"END:",settings.end); };
+
+    DS.findAll('setting', {limit: settings.limit, skip: settings.skip, sort: settings.sort})
+    .then(function(list){
+
+      settings.settings = _.merge(settings.settings, list);
+      settings.visible = list;
+      settings.skip = settings.skip + settings.limit;
+        
+    })
+    .finally(function () {
+      settings.busy = false;
+    })
+    .catch(function(err){
+      if(utils.development()){ console.log(err); }; // reason why query failed
+      settings.error = err.status;
+      settings.message = err.data;
+    });
+
+  }
+  
+  return Settings;
+
+
+ })
 ;
