@@ -1,3 +1,5 @@
+(function ( window, angular ) {
+
 'use strict';
 
 /**
@@ -11,12 +13,14 @@
  * http://github.com/CaliStyle/humpback-core-pack
  */
 angular.module('humpback.core', [
+  'humpback.io',
   'ngTagsInput',
   'ui.ace',
   'ngSanitize',
 
   'humpback.core.cms',
   'humpback.core.users',
+  'humpback.core.categories',
   'humpback.core.routes',
   'humpback.core.models',
   'humpback.core.settings'
@@ -180,7 +184,6 @@ angular.module('humpback.core.users', [])
       users.busy = false;
     })
     .catch(function(err){
-      if(utils.development()){ console.log(err); }; // reason why query failed
       users.error = err.status;
       users.message = err.data;
     });
@@ -213,7 +216,6 @@ angular.module('humpback.core.users', [])
       users.busy = false;
     })
     .catch(function(err){
-      if(utils.development()){ console.log(err); }; // reason why query failed
       users.error = err.status;
       users.message = err.data;
     });
@@ -263,7 +265,6 @@ angular.module('humpback.core.users', [])
       user.busy = false;
     })
     .catch(function (err) {
-      if(utils.development()){ console.log(err); }; // reason why query failed
       user.error = err.status;
       user.message = err.data;
     });
@@ -282,7 +283,6 @@ angular.module('humpback.core.users', [])
       user.busy = false;
     })
     .catch(function (err) {
-      if(utils.development()){ console.log(err); }; // reason why query failed
       user.error = err.status;
       user.message = err.data;
     });
@@ -309,7 +309,6 @@ angular.module('humpback.core.users', [])
       user.updating = false;
     })
     .catch(function(err){
-      if(utils.development()){ console.log(err); }; // reason why query failed
       user.error = err.status;
       user.message = err.data;
     });
@@ -318,59 +317,344 @@ angular.module('humpback.core.users', [])
   return User;
 
 })
-
 ;
 
-angular.module('humpback.core.routes', [])
-.factory('Routes', function(DS, utils) {
+angular.module('humpback.core.categories', [])
+.factory('Categories', function(DS, utils, $location) {
   
-  var Routes = function() {
+  var Categories = function() {
     this.visible = [];
-    this.routes = [];
+    this.categories = [];
     this.busy = false;
     this.skip = 0;
-    this.limit = 10;
+    this.limit = 100;
     this.total = 0;
     this.start = 0;
-    this.end = 10;
-    this.criteria = '';
+    this.end = 100;
+    this.criteria = {};
     this.sort = 'createdAt desc';
     this.error = null;
     this.message = null;
   };
 
-  Routes.prototype.prevPage = function() {
+  Categories.prototype.buildRequest = function(){
+    var categories = this;
+
+    var request = {
+      limit: categories.limit,
+      skip: categories.skip,
+      sort: categories.sort
+    }
+    if(!_.isEmpty(categories.criteria)){
+      request.where = categories.criteria;
+    }
+    return request;
+  };
+
+  Categories.prototype.search = function() {
+    var categories = this, request;
+    
+    if (categories.busy){ 
+      return;
+    }
+    categories.busy = true;
+    request = categories.buildRequest();
+    
+    if(utils.development()){ console.log("SKIP:",categories.skip,"START:",categories.start,"END:",categories.end,"WHERE:",categories.criteria); };
+    
+    DS.findAll('category', request)
+    .then(function(list){
+      
+      categories.categories = _.merge(categories.categories, list);
+      categories.visible = _.rest(categories.categories, categories.start).slice(0, categories.end);
+      categories.skip = categories.skip + categories.limit;
+
+    })
+    .finally(function () {
+      categories.busy = false;
+    })
+    .catch(function(err){
+      categories.error = err.status;
+      categories.message = err.data;
+    });
+  }
+
+  Categories.prototype.init = function() {
+    var categories = this;
+    
+    if (categories.busy){ 
+      return;
+    }
+
+    categories.start = categories.skip;
+    categories.end = categories.skip + categories.limit;
+    
+    categories.search();
+  }
+
+  Categories.prototype.infinite = function() {
+    var categories = this;
+    if (categories.busy){ 
+      return;
+    }
+
+    categories.start = 0;
+    categories.end = categories.skip + categories.limit;
+    
+    categories.search();
+
+  }
+
+  Categories.prototype.prevPage = function() {
+    var categories = this, request;
+    
+    if (categories.busy){ 
+      return;
+    }
+ 
+    categories.skip = categories.skip - categories.limit * 2 >= 0 ? categories.skip - categories.limit * 2 : 0;
+    categories.start = categories.skip;
+    categories.end = categories.skip + categories.limit;
+
+    categories.search();
+
+  }
+
+  Categories.prototype.nextPage = function() {
+    var categories = this, request;
+    
+    if (categories.busy){ 
+      return;
+    }
+
+    categories.start = categories.skip;
+    categories.end = categories.skip + categories.limit;
+    
+    categories.search();
+
+  }
+
+  Categories.prototype.reset = function(type) {
+    var categories = this;
+    if(type){
+       $location.search(type, categories[type]);
+    }
+    
+    this.skip = 0;
+    this.init(); 
+  }
+  
+  return Categories;
+
+})
+.factory('Category', function(DS, utils, $state) {
+
+  var Category = function(id) {
+    this.id = id;
+    this.category = {};
+    this.criteria = {};
+    this.busy = false;
+    this.updating = false;
+    this.error = null;
+    this.message = null;
+    
+  };
+
+  Category.prototype.create = function(thiscategory) {
+    var category = this;
+    
+    if (category.busy || category.updating){ 
+      return;
+    }
+    category.busy = true;
+    category.updating = true;
+
+    DS.create('category', thiscategory)
+    .then(function(thiscategory){
+      
+      category.category = thiscategory;
+      category.id = thiscategory.id;
+      utils.alert({location: 'system-alerts', color: 'success', title:category.category.name, content: 'Created Successfully', autoclose: 2000});
+      $state.go('admin.cms.categories.view',{id: thiscategory.id});
+    })
+    .finally(function () {
+      category.busy = false;
+      category.updating = false;
+    })
+    .catch(function (err) {
+      category.error = err.status;
+      category.message = err.data;
+      utils.alert({location: 'system-alerts', color: 'error', title:category.category.name, content: err.status, autoclose: 2000});
+    });
+
+  }
+
+  Category.prototype.read = function() {
+    var category = this;
+    if (category.busy){ 
+      return;
+    }
+    category.busy = true;
+
+    DS.find('category', category.id)
+    .then(function(thiscategory){
+      
+      console.log(thiscategory);
+      category.category = thiscategory;
+
+    })
+    .finally(function () {
+      category.busy = false;
+    })
+    .catch(function (err) {
+      category.error = err.status;
+      category.message = err.data;
+    });
+  }
+
+  Category.prototype.update = function(thiscategory) {
+    var category = this;
+    
+    if (category.busy || category.updating){ 
+      return;
+    }
+    category.busy = true;
+    category.updating = true;
+    
+    console.log(category.category);
+    //delete thisroute.target;
+
+    DS.update('category', category.id, thiscategory)
+    .then(function(updatedCategory){
+      category.category = updatedCategory;
+      utils.alert({location: 'system-alerts', color: 'success', title:category.category.name, content: 'Updated Successfully', autoclose: 2000});
+    })
+    .finally(function () {
+      category.busy = false;
+      category.updating = false;
+    })
+    .catch(function(err){
+      category.error = err.status;
+      category.message = err.data;
+      utils.alert({location: 'system-alerts', color: 'error', title: category.category.name, content: err.status, autoclose: 2000});
+    });
+  }
+
+  Category.prototype.add = function () {
+
+  }
+
+  Category.prototype.remove = function () {
+    
+  }
+
+
+  return Category;
+})
+;
+
+
+angular.module('humpback.core.routes', [])
+.factory('Routes', function(DS, utils, $location, Categories) {
+  
+  var Routes = function() {
+    this.visible    = [];
+    this.routes     = [];
+    this.categories = new Categories().init();
+    this.busy       = false;
+    this.skip       = 0;
+    this.limit      = 10;
+    this.total      = 0;
+    this.pages      = 0;
+    this.start      = 0;
+    this.end        = 10;
+    this.criteria   = {verb: 'get'};
+    this.sort       = 'createdAt desc';
+    this.error      = null;
+    this.message    = null;
+  };
+
+  Routes.prototype.buildRequest = function(){
     var routes = this;
+
+    var request = {
+      limit: routes.limit,
+      skip: routes.skip,
+      sort: routes.sort
+    }
+    if(!_.isEmpty(routes.criteria)){
+      request.where = routes.criteria;
+    }
+    return request;
+  };
+
+  Routes.prototype.search = function() {
+    var routes = this, request;
     
     if (routes.busy){ 
       return;
     }
     routes.busy = true;
+    request = routes.buildRequest();
+    
+    if(utils.development()){ console.log("SKIP:",routes.skip,"START:",routes.start,"END:",routes.end,"WHERE:",routes.criteria); };
+    
+    DS.findAll('route', request)
+    .then(function(list){
+      routes.routes = _.merge(routes.routes, list);
+      routes.visible = _.rest(routes.routes, routes.start).slice(0, routes.end);
+      routes.skip = routes.skip + routes.limit;
 
+    })
+    .finally(function (request) {
+      console.log(request);
+
+      routes.busy = false;
+    })
+    .catch(function(err){
+      routes.error = err.status;
+      routes.message = err.data;
+    });
+  }
+
+  Routes.prototype.init = function() {
+    var routes = this;
+    if (routes.busy){ 
+      return;
+    }
+
+    routes.start = routes.skip;
+    routes.end = routes.skip + routes.limit;
+    
+    routes.search();
+  }
+
+  Routes.prototype.infinite = function() {
+    var routes = this;
+    if (routes.busy){ 
+      return;
+    }
+
+    routes.start = 0;
+    routes.end = routes.skip + routes.limit;
+    
+    routes.search();
+
+  }
+
+  Routes.prototype.prevPage = function() {
+    var routes = this;
+    if (routes.busy){ 
+      return;
+    }
+ 
     routes.skip = routes.skip - routes.limit * 2 >= 0 ? routes.skip - routes.limit * 2 : 0;
     routes.start = routes.skip;
     routes.end = routes.skip + routes.limit;
 
-    if(utils.development()){ console.log("SKIP:",routes.skip,"START:",routes.start,"END:",routes.end); };
+    routes.search();
 
-    DS.findAll('route', {limit: routes.limit, skip: routes.skip, sort: routes.sort})
-    .then(function(list){
-
-      routes.routes = _.merge(routes.routes, list);
-      routes.visible = list;
-      routes.skip = routes.skip + routes.limit;
-
-    })
-    .finally(function () {
-      routes.busy = false;
-    })
-    .catch(function(err){
-      if(utils.development()){ console.log(err); }; // reason why query failed
-      routes.error = err.status;
-      routes.message = err.data;
-    });
-
-   }
+  }
 
   Routes.prototype.nextPage = function() {
     var routes = this;
@@ -378,30 +662,22 @@ angular.module('humpback.core.routes', [])
     if (routes.busy){ 
       return;
     }
-    routes.busy = true;
 
     routes.start = routes.skip;
     routes.end = routes.skip + routes.limit;
+    
+    routes.search();
 
-    if(utils.development()){ console.log("SKIP:",routes.skip,"START:",routes.start,"END:",routes.end); };
+  }
 
-    DS.findAll('route', {limit: routes.limit, skip: routes.skip, sort: routes.sort})
-    .then(function(list){
+  Routes.prototype.reset = function(type) {
+    var routes = this;
+    if(type){
+       $location.search(type, routes[type]);
+    }
 
-      routes.routes = _.merge(routes.routes, list);
-      routes.visible = list;
-      routes.skip = routes.skip + routes.limit;
-
-    })
-    .finally(function () {
-      routes.busy = false;
-    })
-    .catch(function(err){
-      if(utils.development()){ console.log(err); }; // reason why query failed
-      routes.error = err.status;
-      routes.message = err.data;
-    });
-
+    this.skip = 0;
+    this.init(); 
   }
   
   return Routes;
@@ -409,12 +685,13 @@ angular.module('humpback.core.routes', [])
 
 })
 
-.factory('Route', function(DS, utils, CMS) {
+.factory('Route', function(DS, utils, CMS, Categories) {
 
   var Route = function(id) {
     this.id = id;
     this.route = {};
-    this.criteria = '';
+    this.categories = new Categories();
+    this.criteria = {};
     this.busy = false;
     this.updating = false;
     this.error = null;
@@ -423,13 +700,28 @@ angular.module('humpback.core.routes', [])
     
   };
   
-  Route.prototype.create = function() {
+  Route.prototype.create = function(thisroute) {
     var route = this;
     
     if (route.busy){ 
       return;
     }
     route.busy = true;
+    DS.create('route', thisroute)
+    .then(function(thisroute){
+      
+      console.log(thisroute);
+
+      route.route = thisroute;
+    })
+    .finally(function () {
+      route.busy = false;
+    })
+    .catch(function (err) {
+      route.error = err.status;
+      route.message = err.data;
+    });
+
 
   }
 
@@ -444,14 +736,13 @@ angular.module('humpback.core.routes', [])
     .then(function(thisroute){
       
       console.log(thisroute);
-
       route.route = thisroute;
+      route.categories.init();
     })
     .finally(function () {
       route.busy = false;
     })
     .catch(function (err) {
-      if(utils.development()){ console.log(err); }; // reason why query failed
       route.error = err.status;
       route.message = err.data;
     });
@@ -475,7 +766,6 @@ angular.module('humpback.core.routes', [])
       route.busy = false;
     })
     .catch(function (err) {
-      if(utils.development()){ console.log(err); }; // reason why query failed
       route.error = err.status;
       route.message = err.data;
     });
@@ -497,15 +787,16 @@ angular.module('humpback.core.routes', [])
     DS.update('route', route.id, thisroute)
     .then(function(updatedRoute){
       route.route = updatedRoute;
+      utils.alert({location: 'system-alerts', color: 'success', title:route.route.title, content: 'Updated Successfully', autoclose: 2000});
     })
     .finally(function () {
       route.busy = false;
       route.updating = false;
     })
     .catch(function(err){
-      if(utils.development()){ console.log(err); }; // reason why query failed
       route.error = err.status;
       route.message = err.data;
+      utils.alert({location: 'system-alerts', color: 'error', title:route.route.title, content: err.status, autoclose: 2000});
     });
   }
 
@@ -559,7 +850,6 @@ angular.module('humpback.core.models', [])
       models.busy = false;
     })
     .catch(function(err){
-      if(utils.development()){ console.log(err); }; // reason why query failed
       models.error = err.status;
       models.message = err.data;
     });
@@ -591,7 +881,6 @@ angular.module('humpback.core.models', [])
       models.busy = false;
     })
     .catch(function(err){
-      if(utils.development()){ console.log(err); }; // reason why query failed
       models.error = err.status;
       models.message = err.data;
     });
@@ -648,7 +937,6 @@ angular.module('humpback.core.settings', [])
       settings.busy = false;
     })
     .catch(function(err){
-      if(utils.development()){ console.log(err); }; // reason why query failed
       settings.error = err.status;
       settings.message = err.data;
     });
@@ -680,7 +968,6 @@ angular.module('humpback.core.settings', [])
       settings.busy = false;
     })
     .catch(function(err){
-      if(utils.development()){ console.log(err); }; // reason why query failed
       settings.error = err.status;
       settings.message = err.data;
     });
@@ -692,3 +979,5 @@ angular.module('humpback.core.settings', [])
 
  })
 ;
+
+})( window, angular );
