@@ -23,7 +23,10 @@ angular.module('humpback.core', [
   'humpback.core.categories',
   'humpback.core.routes',
   'humpback.core.models',
-  'humpback.core.settings'
+  'humpback.core.settings',
+  'humpback.core.roles',
+  'humpback.core.emails'
+  
 ]);
 
 angular.module('humpback.core.cms', [])
@@ -138,57 +141,102 @@ angular.module('humpback.core.users', [])
 .factory('Users', function(DS, utils) {
   
   var Users = function() {
-    this.visible = [];
-    this.users = [];
-    this.busy = false;
-    this.skip = 0;
-    this.limit = 10;
-    this.total = 0;
-    this.start = 0;
-    this.end = 10;
-    this.criteria = '';
-    this.sort = 'createdAt desc';
-    this.error = null;
-    this.message = null;
+    this.visible    = [];
+    this.users     = [];
+    this.busy       = false;
+    this.skip       = 0;
+    this.limit      = 10;
+    this.total      = 0;
+    this.pages      = 0;
+    this.start      = 0;
+    this.end        = 10;
+    this.criteria   = {};
+    this.sort       = 'createdAt desc';
+    this.error      = null;
+    this.message    = null;
   };
-  
-  Users.prototype.count = function() {
-    var users = this;
-    users.total = 0;
 
-  }
-
-  Users.prototype.prevPage = function() {
+  Users.prototype.buildRequest = function(){
     var users = this;
+
+    var request = {
+      limit: users.limit,
+      skip: users.skip,
+      sort: users.sort
+    }
+    if(!_.isEmpty(users.criteria)){
+      request.where = users.criteria;
+    }
+    return request;
+  };
+
+  Users.prototype.search = function() {
+    var users = this, request;
     
     if (users.busy){ 
       return;
     }
     users.busy = true;
-
-    users.skip = users.skip - users.limit * 2 >= 0 ? users.skip - users.limit * 2 : 0;
-    users.start = users.skip;
-    users.end = users.skip + users.limit;
-
-    if(utils.development()){ console.log("SKIP:",users.skip,"START:",users.start,"END:",users.end); };
-
-    DS.findAll('route', {limit: users.limit, skip: users.skip, sort: users.sort})
+    request = users.buildRequest();
+    
+    if(utils.development()){ console.log("SKIP:",users.skip,"START:",users.start,"END:",users.end,"WHERE:",users.criteria); };
+    
+    DS.findAll('user', request)
     .then(function(list){
-
-      users.users = _.merge(users.users, list);
-      users.visible = list;
+      users.users = _.union(users.users, list);
+      users.visible = _.slice(users.users, users.start, users.end);
       users.skip = users.skip + users.limit;
-      
+
     })
-    .finally(function () {
+    .finally(function (request) {
+      console.log(request);
+
       users.busy = false;
     })
     .catch(function(err){
       users.error = err.status;
       users.message = err.data;
     });
+  }
 
-   }
+  Users.prototype.init = function() {
+    var users = this;
+    if (users.busy){ 
+      return;
+    }
+
+    users.start = users.skip;
+    users.end = users.skip + users.limit;
+    
+    users.search();
+  }
+
+  Users.prototype.infinite = function() {
+    var users = this;
+    if (users.busy){ 
+      return;
+    }
+
+    users.start = 0;
+    users.end = users.skip + users.limit;
+    
+    users.search();
+
+  }
+
+  Users.prototype.prevPage = function() {
+    var users = this;
+    if (users.busy){ 
+      return;
+    }
+ 
+    users.skip = users.skip - users.limit * 2 >= 0 ? users.skip - users.limit * 2 : 0;
+    users.start = users.skip;
+    users.end = users.skip + users.limit;
+
+    users.search();
+
+  }
 
   Users.prototype.nextPage = function() {
     var users = this;
@@ -197,30 +245,22 @@ angular.module('humpback.core.users', [])
       return;
     }
 
-    users.busy = true;
-
     users.start = users.skip;
     users.end = users.skip + users.limit;
+    
+    users.search();
 
-    if(utils.development()){ console.log("SKIP:",users.skip,"START:",users.start,"END:",users.end); };
+  }
 
-    DS.findAll('user', {limit: users.limit, skip: users.skip, sort: users.sort})
-    .then(function(list){
+  Users.prototype.reset = function(type) {
+    var users = this;
+    if(type){
+       $location.search(type, users[type]);
+    }
 
-      users.users = _.merge(users.users, list);
-      users.visible = list;
-      users.skip = users.skip + users.limit;
-        
-    })
-    .finally(function () {
-      users.busy = false;
-    })
-    .catch(function(err){
-      users.error = err.status;
-      users.message = err.data;
-    });
-
-   }
+    this.skip = 0;
+    this.init(); 
+  }
   
   return Users;
 })
@@ -365,8 +405,8 @@ angular.module('humpback.core.categories', [])
     DS.findAll('category', request)
     .then(function(list){
       
-      categories.categories = _.merge(categories.categories, list);
-      categories.visible = _.rest(categories.categories, categories.start).slice(0, categories.end);
+      categories.categories = _.union(categories.categories, list);
+      categories.visible = _.slice(categories.categories, categories.start, categories.end);
       categories.skip = categories.skip + categories.limit;
 
     })
@@ -601,8 +641,8 @@ angular.module('humpback.core.routes', [])
     
     DS.findAll('route', request)
     .then(function(list){
-      routes.routes = _.merge(routes.routes, list);
-      routes.visible = _.rest(routes.routes, routes.start).slice(0, routes.end);
+      routes.routes = _.union(routes.routes, list);
+      routes.visible = _.slice(routes.routes, routes.start, routes.end);
       routes.skip = routes.skip + routes.limit;
 
     })
@@ -896,50 +936,100 @@ angular.module('humpback.core.settings', [])
 .factory('Settings', function(DS, utils) {
   
   var Settings = function() {
-    this.visible = [];
-    this.settings = [];
-    this.busy = false;
-    this.skip = 0;
-    this.limit = 10;
-    this.total = 0;
-    this.start = 0;
-    this.end = 10;
-    this.criteria = '';
-    this.sort = 'createdAt desc';
-    this.error = null;
-    this.message = null;
-
+    this.visible    = [];
+    this.settings     = [];
+    this.busy       = false;
+    this.skip       = 0;
+    this.limit      = 10;
+    this.total      = 0;
+    this.pages      = 0;
+    this.start      = 0;
+    this.end        = 10;
+    this.criteria   = {};
+    this.sort       = 'createdAt desc';
+    this.error      = null;
+    this.message    = null;
   };
 
-  Settings.prototype.prevPage = function() {
+  Settings.prototype.buildRequest = function(){
     var settings = this;
+
+    var request = {
+      limit: settings.limit,
+      skip: settings.skip,
+      sort: settings.sort
+    }
+    if(!_.isEmpty(settings.criteria)){
+      request.where = settings.criteria;
+    }
+    return request;
+  };
+
+  Settings.prototype.search = function() {
+    var settings = this, request;
     
     if (settings.busy){ 
       return;
     }
     settings.busy = true;
-
-    settings.skip = settings.skip - settings.limit * 2 >= 0 ? settings.skip - settings.limit * 2 : 0;
-    settings.start = settings.skip;
-    settings.end = settings.skip + settings.limit;
-
-    if(utils.development()){ console.log("SKIP:",settings.skip,"START:",settings.start,"END:",settings.end); };
-
-    DS.findAll('setting', {limit: settings.limit, skip: settings.skip, sort: settings.sort})
+    request = settings.buildRequest();
+    
+    if(utils.development()){ console.log("SKIP:",settings.skip,"START:",settings.start,"END:",settings.end,"WHERE:",settings.criteria); };
+    
+    DS.findAll('setting', request)
     .then(function(list){
-
-      settings.settings = _.merge(settings.settings, list);
-      settings.visible = list;
+      settings.settings = _.union(settings.settings, list);
+      settings.visible = _.slice(settings.settings, settings.start, settings.end);
       settings.skip = settings.skip + settings.limit;
-       
+
     })
-    .finally(function () {
+    .finally(function (request) {
+      console.log(request);
+
       settings.busy = false;
     })
     .catch(function(err){
       settings.error = err.status;
       settings.message = err.data;
     });
+  }
+
+  Settings.prototype.init = function() {
+    var settings = this;
+    if (settings.busy){ 
+      return;
+    }
+
+    settings.start = settings.skip;
+    settings.end = settings.skip + settings.limit;
+    
+    settings.search();
+  }
+
+  Settings.prototype.infinite = function() {
+    var settings = this;
+    if (settings.busy){ 
+      return;
+    }
+
+    settings.start = 0;
+    settings.end = settings.skip + settings.limit;
+    
+    settings.search();
+
+  }
+
+  Settings.prototype.prevPage = function() {
+    var settings = this;
+    if (settings.busy){ 
+      return;
+    }
+ 
+    settings.skip = settings.skip - settings.limit * 2 >= 0 ? settings.skip - settings.limit * 2 : 0;
+    settings.start = settings.skip;
+    settings.end = settings.skip + settings.limit;
+
+    settings.search();
 
   }
 
@@ -949,35 +1039,288 @@ angular.module('humpback.core.settings', [])
     if (settings.busy){ 
       return;
     }
-    settings.busy = true;
 
     settings.start = settings.skip;
     settings.end = settings.skip + settings.limit;
+    
+    settings.search();
 
-    if(utils.development()){console.log("SKIP:",settings.skip,"START:",settings.start,"END:",settings.end); };
+  }
 
-    DS.findAll('setting', {limit: settings.limit, skip: settings.skip, sort: settings.sort})
-    .then(function(list){
+  Settings.prototype.reset = function(type) {
+    var settings = this;
+    if(type){
+       $location.search(type, settings[type]);
+    }
 
-      settings.settings = _.merge(settings.settings, list);
-      settings.visible = list;
-      settings.skip = settings.skip + settings.limit;
-        
-    })
-    .finally(function () {
-      settings.busy = false;
-    })
-    .catch(function(err){
-      settings.error = err.status;
-      settings.message = err.data;
-    });
-
+    this.skip = 0;
+    this.init(); 
   }
   
   return Settings;
 
-
  })
 ;
+
+angular.module('humpback.core.roles', [])
+.factory('Roles', function(DS, utils, $location, Categories) {
+  
+  var Roles = function() {
+    this.visible    = [];
+    this.roles     = [];
+    this.busy       = false;
+    this.skip       = 0;
+    this.limit      = 10;
+    this.total      = 0;
+    this.pages      = 0;
+    this.start      = 0;
+    this.end        = 10;
+    this.criteria   = {};
+    this.sort       = 'createdAt desc';
+    this.error      = null;
+    this.message    = null;
+  };
+
+  Roles.prototype.buildRequest = function(){
+    var roles = this;
+
+    var request = {
+      limit: roles.limit,
+      skip: roles.skip,
+      sort: roles.sort
+    }
+    if(!_.isEmpty(roles.criteria)){
+      request.where = roles.criteria;
+    }
+    return request;
+  };
+
+  Roles.prototype.search = function() {
+    var roles = this, request;
+    
+    if (roles.busy){ 
+      return;
+    }
+    roles.busy = true;
+    request = roles.buildRequest();
+    
+    if(utils.development()){ console.log("SKIP:",roles.skip,"START:",roles.start,"END:",roles.end,"WHERE:",roles.criteria); };
+    
+    DS.findAll('role', request)
+    .then(function(list){
+      roles.roles = _.union(roles.roles, list);
+      roles.visible = _.slice(roles.roles, roles.start, roles.end);
+      roles.skip = roles.skip + roles.limit;
+
+    })
+    .finally(function (request) {
+      console.log(request);
+
+      roles.busy = false;
+    })
+    .catch(function(err){
+      roles.error = err.status;
+      roles.message = err.data;
+    });
+  }
+
+  Roles.prototype.init = function() {
+    var roles = this;
+    if (roles.busy){ 
+      return;
+    }
+
+    roles.start = roles.skip;
+    roles.end = roles.skip + roles.limit;
+    
+    roles.search();
+  }
+
+  Roles.prototype.infinite = function() {
+    var roles = this;
+    if (roles.busy){ 
+      return;
+    }
+
+    roles.start = 0;
+    roles.end = roles.skip + roles.limit;
+    
+    roles.search();
+
+  }
+
+  Roles.prototype.prevPage = function() {
+    var roles = this;
+    if (roles.busy){ 
+      return;
+    }
+ 
+    roles.skip = roles.skip - roles.limit * 2 >= 0 ? roles.skip - roles.limit * 2 : 0;
+    roles.start = roles.skip;
+    roles.end = roles.skip + roles.limit;
+
+    roles.search();
+
+  }
+
+  Roles.prototype.nextPage = function() {
+    var roles = this;
+    
+    if (roles.busy){ 
+      return;
+    }
+
+    roles.start = roles.skip;
+    roles.end = roles.skip + roles.limit;
+    
+    roles.search();
+
+  }
+
+  Roles.prototype.reset = function(type) {
+    var roles = this;
+    if(type){
+       $location.search(type, roles[type]);
+    }
+
+    this.skip = 0;
+    this.init(); 
+  }
+  
+  return Roles;
+
+
+})
+
+;
+
+angular.module('humpback.core.emails', [])
+
+.factory('Emails', function(DS, utils) {
+  
+  var Emails = function() {
+    this.visible    = [];
+    this.emails     = [];
+    this.busy       = false;
+    this.skip       = 0;
+    this.limit      = 10;
+    this.total      = 0;
+    this.pages      = 0;
+    this.start      = 0;
+    this.end        = 10;
+    this.criteria   = {};
+    this.sort       = 'createdAt desc';
+    this.error      = null;
+    this.message    = null;
+  };
+
+  Emails.prototype.buildRequest = function(){
+    var emails = this;
+
+    var request = {
+      limit: emails.limit,
+      skip: emails.skip,
+      sort: emails.sort
+    }
+    if(!_.isEmpty(emails.criteria)){
+      request.where = emails.criteria;
+    }
+    return request;
+  };
+
+  Emails.prototype.search = function() {
+    var emails = this, request;
+    
+    if (emails.busy){ 
+      return;
+    }
+    emails.busy = true;
+    request = emails.buildRequest();
+    
+    if(utils.development()){ console.log("SKIP:",emails.skip,"START:",emails.start,"END:",emails.end,"WHERE:",emails.criteria); };
+    
+    DS.findAll('email', request)
+    .then(function(list){
+      emails.emails = _.union(emails.emails, list);
+      emails.visible = _.slice(emails.emails, emails.start, emails.end);
+      emails.skip = emails.skip + emails.limit;
+
+    })
+    .finally(function (request) {
+      console.log(request);
+
+      emails.busy = false;
+    })
+    .catch(function(err){
+      emails.error = err.status;
+      emails.message = err.data;
+    });
+  }
+
+  Emails.prototype.init = function() {
+    var emails = this;
+    if (emails.busy){ 
+      return;
+    }
+
+    emails.start = emails.skip;
+    emails.end = emails.skip + emails.limit;
+    
+    emails.search();
+  }
+
+  Emails.prototype.infinite = function() {
+    var emails = this;
+    if (emails.busy){ 
+      return;
+    }
+
+    emails.start = 0;
+    emails.end = emails.skip + emails.limit;
+    
+    emails.search();
+
+  }
+
+  Emails.prototype.prevPage = function() {
+    var emails = this;
+    if (emails.busy){ 
+      return;
+    }
+ 
+    emails.skip = emails.skip - emails.limit * 2 >= 0 ? emails.skip - emails.limit * 2 : 0;
+    emails.start = emails.skip;
+    emails.end = emails.skip + emails.limit;
+
+    emails.search();
+
+  }
+
+  Emails.prototype.nextPage = function() {
+    var emails = this;
+    
+    if (emails.busy){ 
+      return;
+    }
+
+    emails.start = emails.skip;
+    emails.end = emails.skip + emails.limit;
+    
+    emails.search();
+
+  }
+
+  Emails.prototype.reset = function(type) {
+    var emails = this;
+    if(type){
+       $location.search(type, emails[type]);
+    }
+
+    this.skip = 0;
+    this.init(); 
+  }
+  
+  return Emails;
+})
 
 })( window, angular );
