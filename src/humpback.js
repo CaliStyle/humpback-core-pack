@@ -19,13 +19,7 @@ angular.module('humpback.core', [
   'ngSanitize',
 
   'humpback.core.cms',
-  'humpback.core.users',
-  'humpback.core.categories',
-  'humpback.core.routes',
-  'humpback.core.models',
-  'humpback.core.settings',
-  'humpback.core.roles',
-  'humpback.core.emails'
+  'humpback.core.api'
   
 ]);
 
@@ -133,1194 +127,493 @@ angular.module('humpback.core.cms', [])
     return angular.element(document.querySelectorAll('meta[property="og:locale"]'));
   }
 
+  CMS.prototype.setPage = function(thisroute) {
+    var cms = this;
+    cms.setTitle(thisroute.title);
+    cms.setDescription(thisroute.description);
+    cms.setImage(thisroute.image);
+    cms.setKeywords(thisroute.keywords);
+  }
+
   return CMS;
 });
 
-angular.module('humpback.core.users', [])
+angular.module('humpback.core.api', [])
+.factory('Api', function(DS, utils, $location, $q) {
 
-.factory('Users', function(DS, utils) {
-  
-  var Users = function() {
-    this.visible    = [];
-    this.users     = [];
-    this.busy       = false;
-    this.skip       = 0;
-    this.limit      = 10;
-    this.total      = 0;
-    this.pages      = 0;
-    this.start      = 0;
-    this.end        = 10;
-    this.criteria   = {};
-    this.sort       = 'createdAt desc';
-    this.error      = null;
-    this.message    = null;
-  };
-
-  Users.prototype.buildRequest = function(){
-    var users = this;
-
-    var request = {
-      limit: users.limit,
-      skip: users.skip,
-      sort: users.sort
-    }
-    if(!_.isEmpty(users.criteria)){
-      request.where = users.criteria;
-    }
-    return request;
-  };
-
-  Users.prototype.search = function() {
-    var users = this, request;
-    
-    if (users.busy){ 
-      return;
-    }
-    users.busy = true;
-    request = users.buildRequest();
-    
-    if(utils.development()){ console.log("SKIP:",users.skip,"START:",users.start,"END:",users.end,"WHERE:",users.criteria); };
-    
-    DS.findAll('user', request)
-    .then(function(list){
-      users.users = _.union(users.users, list);
-      users.visible = _.slice(users.users, users.start, users.end);
-      users.skip = users.skip + users.limit;
-
-    })
-    .finally(function (request) {
-      console.log(request);
-
-      users.busy = false;
-    })
-    .catch(function(err){
-      users.error = err.status;
-      users.message = err.data;
-    });
-  }
-
-  Users.prototype.init = function() {
-    var users = this;
-    if (users.busy){ 
-      return;
-    }
-
-    users.start = users.skip;
-    users.end = users.skip + users.limit;
-    
-    users.search();
-  }
-
-  Users.prototype.infinite = function() {
-    var users = this;
-    if (users.busy){ 
-      return;
-    }
-
-    users.start = 0;
-    users.end = users.skip + users.limit;
-    
-    users.search();
-
-  }
-
-  Users.prototype.prevPage = function() {
-    var users = this;
-    if (users.busy){ 
-      return;
-    }
- 
-    users.skip = users.skip - users.limit * 2 >= 0 ? users.skip - users.limit * 2 : 0;
-    users.start = users.skip;
-    users.end = users.skip + users.limit;
-
-    users.search();
-
-  }
-
-  Users.prototype.nextPage = function() {
-    var users = this;
-    
-    if (users.busy){ 
-      return;
-    }
-
-    users.start = users.skip;
-    users.end = users.skip + users.limit;
-    
-    users.search();
-
-  }
-
-  Users.prototype.reset = function(type) {
-    var users = this;
-    if(type){
-       $location.search(type, users[type]);
-    }
-
-    this.skip = 0;
-    this.init(); 
-  }
-  
-  return Users;
-})
-.factory('User', function(DS, utils) {
-
-  var User = function(id) {
-    this.id = id;
-    this.user = {};
-    this.criteria = '';
-    this.busy = false;
-    this.updating = false;
-    this.error = null;
-    this.message = null;
-    
-  };
-  
-  User.prototype.create = function() {
-    var user = this;
-    
-    if (user.busy){ 
-      return;
-    }
-    user.busy = true;
-
-  }
-
-  User.prototype.read = function() {
-    var user = this;
-    if (user.busy){ 
-      return;
-    }
-    user.busy = true;
-
-    DS.find('user', user.id)
-    .then(function(thisuser){
-      
-      console.log(thisuser);
-
-      user.user = thisuser;
-    })
-    .finally(function () {
-      user.busy = false;
-    })
-    .catch(function (err) {
-      user.error = err.status;
-      user.message = err.data;
-    });
-  }
-
-  User.prototype.get = function(id) {
-    var user = this;
-    user.busy = true;
-
-    DS.find('user', id)
-    .then(function(thisuser){
-      user.user = thisuser;
-
-    })
-    .finally(function () {
-      user.busy = false;
-    })
-    .catch(function (err) {
-      user.error = err.status;
-      user.message = err.data;
-    });
-  }
-  
-
-  User.prototype.update = function(thisroute) {
-    var user = this;
-    
-    if (user.busy || user.updating){ 
-      return;
-    }
-    user.busy = true;
-    user.updating = true;
-    
-    console.log(user.user);
-
-    DS.update('user', user.id, thisuser)
-    .then(function(updatedUser){
-      user.user = updatedUser;
-    })
-    .finally(function () {
-      user.busy = false;
-      user.updating = false;
-    })
-    .catch(function(err){
-      user.error = err.status;
-      user.message = err.data;
-    });
-  }
-
-  return User;
-
-})
-;
-
-angular.module('humpback.core.categories', [])
-.factory('Categories', function(DS, utils, $location) {
-  
-  var Categories = function() {
+  /*
+   * Api
+   * @param String resource
+   * @param Function cb
+   */
+  var Api = function(resource, cb) {
+    //Holds the models displayed
     this.visible = [];
-    this.categories = [];
+    
+    //Holds all models
+    this.api = [];
+
+    //A single Selected model
+    this.selected = {};
+    
+    //Type of model
+    this.resource = resource;
+
+    //Callback
+    this.cb = cb || angular.noop;
+
+    this.deferred = typeof cb !== 'function' ? $q.defer() : null; 
+
+    //If api busy
     this.busy = false;
-    this.skip = 0;
-    this.limit = 100;
-    this.total = 0;
-    this.start = 0;
-    this.end = 100;
-    this.criteria = {};
-    this.sort = 'createdAt desc';
-    this.error = null;
-    this.message = null;
-  };
-
-  Categories.prototype.buildRequest = function(){
-    var categories = this;
-
-    var request = {
-      limit: categories.limit,
-      skip: categories.skip,
-      sort: categories.sort
-    }
-    if(!_.isEmpty(categories.criteria)){
-      request.where = categories.criteria;
-    }
-    return request;
-  };
-
-  Categories.prototype.search = function() {
-    var categories = this, request;
     
-    if (categories.busy){ 
-      return;
-    }
-    categories.busy = true;
-    request = categories.buildRequest();
-    
-    if(utils.development()){ console.log("SKIP:",categories.skip,"START:",categories.start,"END:",categories.end,"WHERE:",categories.criteria); };
-    
-    DS.findAll('category', request)
-    .then(function(list){
-      
-      categories.categories = _.union(categories.categories, list);
-      categories.visible = _.slice(categories.categories, categories.start, categories.end);
-      categories.skip = categories.skip + categories.limit;
-
-    })
-    .finally(function () {
-      categories.busy = false;
-    })
-    .catch(function(err){
-      categories.error = err.status;
-      categories.message = err.data;
-    });
-  }
-
-  Categories.prototype.init = function() {
-    var categories = this;
-    
-    if (categories.busy){ 
-      return;
-    }
-
-    categories.start = categories.skip;
-    categories.end = categories.skip + categories.limit;
-    
-    categories.search();
-  }
-
-  Categories.prototype.infinite = function() {
-    var categories = this;
-    if (categories.busy){ 
-      return;
-    }
-
-    categories.start = 0;
-    categories.end = categories.skip + categories.limit;
-    
-    categories.search();
-
-  }
-
-  Categories.prototype.prevPage = function() {
-    var categories = this, request;
-    
-    if (categories.busy){ 
-      return;
-    }
- 
-    categories.skip = categories.skip - categories.limit * 2 >= 0 ? categories.skip - categories.limit * 2 : 0;
-    categories.start = categories.skip;
-    categories.end = categories.skip + categories.limit;
-
-    categories.search();
-
-  }
-
-  Categories.prototype.nextPage = function() {
-    var categories = this, request;
-    
-    if (categories.busy){ 
-      return;
-    }
-
-    categories.start = categories.skip;
-    categories.end = categories.skip + categories.limit;
-    
-    categories.search();
-
-  }
-
-  Categories.prototype.reset = function(type) {
-    var categories = this;
-    if(type){
-       $location.search(type, categories[type]);
-    }
-    
-    this.skip = 0;
-    this.init(); 
-  }
-  
-  return Categories;
-
-})
-.factory('Category', function(DS, utils, $state) {
-
-  var Category = function(id) {
-    this.id = id;
-    this.category = {};
-    this.criteria = {};
-    this.busy = false;
+    //If api updating
     this.updating = false;
-    this.error = null;
-    this.message = null;
     
-  };
-
-  Category.prototype.create = function(thiscategory) {
-    var category = this;
-    
-    if (category.busy || category.updating){ 
-      return;
-    }
-    category.busy = true;
-    category.updating = true;
-
-    DS.create('category', thiscategory)
-    .then(function(thiscategory){
-      
-      category.category = thiscategory;
-      category.id = thiscategory.id;
-      utils.alert({location: 'system-alerts', color: 'success', title:category.category.name, content: 'Created Successfully', autoclose: 2000});
-      $state.go('admin.cms.categories.view',{id: thiscategory.id});
-    })
-    .finally(function () {
-      category.busy = false;
-      category.updating = false;
-    })
-    .catch(function (err) {
-      category.error = err.status;
-      category.message = err.data;
-      utils.alert({location: 'system-alerts', color: 'error', title:category.category.name, content: err.status, autoclose: 2000});
-    });
-
-  }
-
-  Category.prototype.read = function() {
-    var category = this;
-    if (category.busy){ 
-      return;
-    }
-    category.busy = true;
-
-    DS.find('category', category.id)
-    .then(function(thiscategory){
-      
-      console.log(thiscategory);
-      category.category = thiscategory;
-
-    })
-    .finally(function () {
-      category.busy = false;
-    })
-    .catch(function (err) {
-      category.error = err.status;
-      category.message = err.data;
-    });
-  }
-
-  Category.prototype.update = function(thiscategory) {
-    var category = this;
-    
-    if (category.busy || category.updating){ 
-      return;
-    }
-    category.busy = true;
-    category.updating = true;
-    
-    console.log(category.category);
-    //delete thisroute.target;
-
-    DS.update('category', category.id, thiscategory)
-    .then(function(updatedCategory){
-      category.category = updatedCategory;
-      utils.alert({location: 'system-alerts', color: 'success', title:category.category.name, content: 'Updated Successfully', autoclose: 2000});
-    })
-    .finally(function () {
-      category.busy = false;
-      category.updating = false;
-    })
-    .catch(function(err){
-      category.error = err.status;
-      category.message = err.data;
-      utils.alert({location: 'system-alerts', color: 'error', title: category.category.name, content: err.status, autoclose: 2000});
-    });
-  }
-
-  Category.prototype.add = function () {
-
-  }
-
-  Category.prototype.remove = function () {
-    
-  }
-
-
-  return Category;
-})
-;
-
-
-angular.module('humpback.core.routes', [])
-.factory('Routes', function(DS, utils, $location, Categories) {
-  
-  var Routes = function() {
-    this.visible    = [];
-    this.routes     = [];
-    this.categories = new Categories().init();
-    this.busy       = false;
-    this.skip       = 0;
-    this.limit      = 10;
-    this.total      = 0;
-    this.pages      = 0;
-    this.start      = 0;
-    this.end        = 10;
-    this.criteria   = {verb: 'get'};
-    this.sort       = 'createdAt desc';
-    this.error      = null;
-    this.message    = null;
-  };
-
-  Routes.prototype.buildRequest = function(){
-    var routes = this;
-
-    var request = {
-      limit: routes.limit,
-      skip: routes.skip,
-      sort: routes.sort
-    }
-    if(!_.isEmpty(routes.criteria)){
-      request.where = routes.criteria;
-    }
-    return request;
-  };
-
-  Routes.prototype.search = function() {
-    var routes = this, request;
-    
-    if (routes.busy){ 
-      return;
-    }
-    routes.busy = true;
-    request = routes.buildRequest();
-    
-    if(utils.development()){ console.log("SKIP:",routes.skip,"START:",routes.start,"END:",routes.end,"WHERE:",routes.criteria); };
-    
-    DS.findAll('route', request)
-    .then(function(list){
-      routes.routes = _.union(routes.routes, list);
-      routes.visible = _.slice(routes.routes, routes.start, routes.end);
-      routes.skip = routes.skip + routes.limit;
-
-    })
-    .finally(function (request) {
-      console.log(request);
-
-      routes.busy = false;
-    })
-    .catch(function(err){
-      routes.error = err.status;
-      routes.message = err.data;
-    });
-  }
-
-  Routes.prototype.init = function() {
-    var routes = this;
-    if (routes.busy){ 
-      return;
-    }
-
-    routes.start = routes.skip;
-    routes.end = routes.skip + routes.limit;
-    
-    routes.search();
-  }
-
-  Routes.prototype.infinite = function() {
-    var routes = this;
-    if (routes.busy){ 
-      return;
-    }
-
-    routes.start = 0;
-    routes.end = routes.skip + routes.limit;
-    
-    routes.search();
-
-  }
-
-  Routes.prototype.prevPage = function() {
-    var routes = this;
-    if (routes.busy){ 
-      return;
-    }
- 
-    routes.skip = routes.skip - routes.limit * 2 >= 0 ? routes.skip - routes.limit * 2 : 0;
-    routes.start = routes.skip;
-    routes.end = routes.skip + routes.limit;
-
-    routes.search();
-
-  }
-
-  Routes.prototype.nextPage = function() {
-    var routes = this;
-    
-    if (routes.busy){ 
-      return;
-    }
-
-    routes.start = routes.skip;
-    routes.end = routes.skip + routes.limit;
-    
-    routes.search();
-
-  }
-
-  Routes.prototype.reset = function(type) {
-    var routes = this;
-    if(type){
-       $location.search(type, routes[type]);
-    }
-
+    //Amount of models to skip
     this.skip = 0;
-    this.init(); 
-  }
-  
-  return Routes;
 
-
-})
-
-.factory('Route', function(DS, utils, CMS, Categories) {
-
-  var Route = function(id) {
-    this.id = id;
-    this.route = {};
-    this.categories = new Categories();
-    this.criteria = {};
-    this.busy = false;
-    this.updating = false;
-    this.error = null;
-    this.message = null;
-    this.cms = new CMS();
-    
-  };
-  
-  Route.prototype.create = function(thisroute) {
-    var route = this;
-    
-    if (route.busy){ 
-      return;
-    }
-    route.busy = true;
-    DS.create('route', thisroute)
-    .then(function(thisroute){
-      
-      console.log(thisroute);
-
-      route.route = thisroute;
-    })
-    .finally(function () {
-      route.busy = false;
-    })
-    .catch(function (err) {
-      route.error = err.status;
-      route.message = err.data;
-    });
-
-
-  }
-
-  Route.prototype.read = function() {
-    var route = this;
-    if (route.busy){ 
-      return;
-    }
-    route.busy = true;
-
-    DS.find('route', route.id)
-    .then(function(thisroute){
-      
-      console.log(thisroute);
-      route.route = thisroute;
-      route.categories.init();
-    })
-    .finally(function () {
-      route.busy = false;
-    })
-    .catch(function (err) {
-      route.error = err.status;
-      route.message = err.data;
-    });
-  }
-
-  Route.prototype.get = function(id) {
-    var route = this;
-    route.busy = true;
-
-    DS.find('route', id)
-    .then(function(thisroute){
-      route.route = thisroute;
-
-       route.cms.setTitle(thisroute.title);
-       route.cms.setDescription(thisroute.description);
-       route.cms.setImage(thisroute.image);
-       route.cms.setKeywords(thisroute.keywords);
-
-    })
-    .finally(function () {
-      route.busy = false;
-    })
-    .catch(function (err) {
-      route.error = err.status;
-      route.message = err.data;
-    });
-  }
-  
-
-  Route.prototype.update = function(thisroute) {
-    var route = this;
-    
-    if (route.busy || route.updating){ 
-      return;
-    }
-    route.busy = true;
-    route.updating = true;
-    
-    console.log(route.route);
-    delete thisroute.target;
-
-    DS.update('route', route.id, thisroute)
-    .then(function(updatedRoute){
-      route.route = updatedRoute;
-      utils.alert({location: 'system-alerts', color: 'success', title:route.route.title, content: 'Updated Successfully', autoclose: 2000});
-    })
-    .finally(function () {
-      route.busy = false;
-      route.updating = false;
-    })
-    .catch(function(err){
-      route.error = err.status;
-      route.message = err.data;
-      utils.alert({location: 'system-alerts', color: 'error', title:route.route.title, content: err.status, autoclose: 2000});
-    });
-  }
-
-  return Route;
-
-})
-;
-
-angular.module('humpback.core.models', [])
-.factory('Models', function(DS, utils) {
-  
-  var Models = function() {
-    this.visible = [];
-    this.models = [];
-    this.busy = false;
-    this.skip = 0;
+    //Amount of models to return 
     this.limit = 10;
+
+    //Total amount of models in collection
     this.total = 0;
+
+    //Total amount of pages collection / limit
+    this.pages = 0;
+
+    //Index of this.api to start adding models to this.visible 
     this.start = 0;
+    
+    //Index of this.api to stop adding models to this.visible
     this.end = 10;
-    this.criteria = '';
-    this.sort = 'createdAt desc';
+    
+    //Criteria to search for 
+    this.criteria = {};
+
+    //Model Api options
+    this.options = {};
+
+    //Sort this.visible
+    this.sort = 'createdAt DESC';
+    
+    //Angular sort this.visible
+    this.angularSort = 'createdAt';
+
+    //Api error codes
     this.error = null;
+
+    //Api error message
     this.message = null;
-
   };
 
-  Models.prototype.prevPage = function() {
-    var models = this;
+  /*
+   * Convert Sorting for Angular vs Sails/Js-data
+   */
+  Api.prototype._handleSort = function(){
+      var api = this, part1 = null, part2 = null;
+      var sortPieces = this.sort.split(" ");
+
+      part1 = sortPieces[0];
+      if(sortPieces[1] === 'DESC'){
+        part2 = '';
+      }else{
+        part2 = '-';
+      }
+      return api.angularSort = part2+part1;
+  };
+
+  /*
+   * Build Request
+   */
+  Api.prototype._buildRequest = function(){
+    var api = this;
+
+    var request = {
+      limit: api.limit,
+      skip: api.skip,
+      sort: api.sort
+    }
+    if(!_.isEmpty(api.criteria)){
+      request.where = api.criteria;
+    }
     
-    if (models.busy){ 
+    api._handleSort();
+
+    return request;
+  };
+
+  /*
+   * Search 
+   */
+  Api.prototype.search = function(cb) {
+    var api = this, request;
+    
+    if (api.busy){ 
       return;
     }
-    models.busy = true;
-
-    models.skip = models.skip - models.limit * 2 >= 0 ? models.skip - models.limit * 2 : 0;
-    models.start = models.skip;
-    models.end = models.skip + models.limit;
-
-    if(utils.development()){ console.log("SKIP:",models.skip,"START:",models.start,"END:",models.end); };
-
-    DS.findAll('model', {limit: models.limit, skip: models.skip, sort: models.sort})
+    api.busy = true;
+    request = api._buildRequest();
+    
+    if(utils.development()){ console.log("SKIP:",api.skip,"START:",api.start,"END:",api.end,"WHERE:",api.criteria,"OPTIONS:",api.options); };
+    
+    DS.findAll(api.resource, request, api.options)
     .then(function(list){
 
-      models.models = _.merge(models.models, list);
-      models.visible = list;
-      models.skip = models.skip + models.limit;
-       
+      api.api = _.union(api.api, list);
+      api.visible = _.slice(api.api, api.start, api.end);
+      api.skip = api.skip + api.limit;
+
+      if(api.deferred){
+        api.deferred.resolve(api.visible);
+      }
+      return api.cb(null, api.visible);
+
+    })
+    .finally(function(){
+      api.busy = false;
+    })
+    .catch(function(err){
+      api.error = err.status;
+      api.message = err.data;
+      
+      if(api.deferred){
+        api.deferred.reject(err);
+      }
+      return api.cb(err);
+
+    });
+
+    if(api.deferred){
+      return api.deferred.promise;
+    }
+  }
+
+  /*
+   * Initiate Page
+   * @param Function cb (optional)
+   */
+  Api.prototype.init = function(cb) {
+    var api = this;
+    if (api.busy){ 
+      return;
+    }
+
+    //Callback
+    api.cb = cb || angular.noop;
+    //Defered
+    api.deferred = typeof cb !== 'function' ? $q.defer() : null; 
+
+    api.start = api.skip;
+    api.end = api.skip + api.limit;
+    
+    return api.search(cb);
+  }
+
+  /*
+   * Infinite Next Page
+   * @param Function cb (optional)
+   */
+  Api.prototype.infinite = function(cb) {
+    var api = this;
+    if (api.busy){ 
+      return;
+    }
+
+    //Callback
+    api.cb = cb || angular.noop;
+    //Defered
+    api.deferred = typeof cb !== 'function' ? $q.defer() : null; 
+
+    api.start = 0;
+    api.end = api.skip + api.limit;
+    
+    return api.search(cb);
+
+  }
+
+  /*
+   * Previous Page
+   * @param Function cb (optional)
+   */
+  Api.prototype.prevPage = function(cb) {
+    var api = this;
+    if (api.busy){ 
+      return;
+    }
+    //Callback
+    api.cb = cb || angular.noop;
+    //Defered
+    api.deferred = typeof cb !== 'function' ? $q.defer() : null; 
+
+    api.skip = api.skip - api.limit * 2 >= 0 ? api.skip - api.limit * 2 : 0;
+    api.start = api.skip;
+    api.end = api.skip + api.limit;
+
+    return api.search(cb);
+
+  }
+  
+  /*
+   * Next Page
+   * @param Function cb (optional)
+   */
+  Api.prototype.nextPage = function(cb) {
+    var api = this;
+    if (api.busy){ 
+      return;
+    }
+    //Callback
+    api.cb = cb || angular.noop;
+    //Defered
+    api.deferred = typeof cb !== 'function' ? $q.defer() : null; 
+
+    api.start = api.skip;
+    api.end = api.skip + api.limit;
+    
+    return api.search(cb);
+
+  }
+
+  /**
+   * Reset the search
+   * @param String type [enum: sort, criteria, limit]
+   * @param Function cb (optional)
+   */
+  Api.prototype.reset = function(type, cb) {
+    var api = this;
+    if(type){
+       $location.search(type, api[type]);
+    }
+    //Callback
+    api.cb = cb || angular.noop;
+    //Defered
+    api.deferred = typeof cb !== 'function' ? $q.defer() : null; 
+
+    this.skip = 0;
+    this.init(cb); 
+  }
+
+  /*
+   * Read model object from the API
+   * @param String id
+   * @param Function cb (optional)
+   */
+
+  Api.prototype.read = function(id, cb) {
+    var api = this;
+    
+    if (api.busy || api.updating){ 
+      return;
+    }
+    api.busy = true;
+
+    //Callback
+    api.cb = cb || angular.noop;
+    //Defered
+    api.deferred = typeof cb !== 'function' ? $q.defer() : null; 
+
+    DS.find(api.resource, id, api.options)
+    .then(function(thisApi){
+      
+      api.selected = thisApi;
+
+      if(api.deferred){
+        api.deferred.resolve(api.selected);
+      }
+      return api.cb(null, api.selected);
+
     })
     .finally(function () {
-      models.busy = false;
+      api.busy = false;
     })
     .catch(function(err){
-      models.error = err.status;
-      models.message = err.data;
+      api.error = err.status;
+      api.message = err.data;
+
+      if(api.deferred){
+        api.deferred.reject(err);
+      }
+      return api.cb(err);
     });
 
+    if(api.deferred){
+      return api.deferred.promise;
+    }
   }
 
-  Models.prototype.nextPage = function() {
-    var models = this;
+  /*
+   * Create model object through API
+   * @param {Object} thisApi
+   * @param Function cb (optional)
+   */
+
+  Api.prototype.create = function(thisApi, cb) {
+    var api = this;
     
-    if (models.busy){ 
+    if (api.busy || api.updating){ 
       return;
     }
-    models.busy = true;
 
-    models.start = models.skip;
-    models.end = models.skip + models.limit;
+    api.busy = true;
+    api.updating = true;
 
-    if(utils.development()){ console.log("SKIP:",models.skip,"START:",models.start,"END:",models.end); };
+    //Callback
+    api.cb = cb || angular.noop;
+    //Defered
+    api.deferred = typeof cb !== 'function' ? $q.defer() : null; 
 
-    DS.findAll('model', {limit: models.limit, skip: models.skip, sort: models.sort})
-    .then(function(list){
+    DS.create(api.resource, thisApi)
+    .then(function(thisApi){
+      api.selected = thisApi;
+      utils.alert({location: 'system-alerts', color: 'success', title: api.resource, content: 'Created Successfully', autoclose: 2000});
+    
+      if(api.deferred){
+        api.deferred.resolve(api.selected);
+      }
+      return api.cb(null, api.selected);
 
-      models.models = _.merge(models.models, list);
-      models.visible = list;
-      models.skip = models.skip + models.limit;
-        
     })
     .finally(function () {
-      models.busy = false;
+      api.busy = false;
+      api.updating = false;
     })
     .catch(function(err){
-      models.error = err.status;
-      models.message = err.data;
+      api.error = err.status;
+      api.message = err.data;
+      utils.alert({location: 'system-alerts', color: 'error', title: api.resource, content: 'Error Creating', autoclose: 2000});
+
+      if(api.deferred){
+        api.deferred.reject(err);
+      }
+      return api.cb(err);
     });
 
+    if(api.deferred){
+      return api.deferred.promise;
+    }
   }
-  
-  return Models;
 
+  /*
+   * Update model object through API
+   * @param {Object} thisApi
+   * @param Function cb (optional)
+   */
 
- });
-
-angular.module('humpback.core.settings', [])
-.factory('Settings', function(DS, utils) {
-  
-  var Settings = function() {
-    this.visible    = [];
-    this.settings     = [];
-    this.busy       = false;
-    this.skip       = 0;
-    this.limit      = 10;
-    this.total      = 0;
-    this.pages      = 0;
-    this.start      = 0;
-    this.end        = 10;
-    this.criteria   = {};
-    this.sort       = 'createdAt desc';
-    this.error      = null;
-    this.message    = null;
-  };
-
-  Settings.prototype.buildRequest = function(){
-    var settings = this;
-
-    var request = {
-      limit: settings.limit,
-      skip: settings.skip,
-      sort: settings.sort
-    }
-    if(!_.isEmpty(settings.criteria)){
-      request.where = settings.criteria;
-    }
-    return request;
-  };
-
-  Settings.prototype.search = function() {
-    var settings = this, request;
-    
-    if (settings.busy){ 
+  Api.prototype.update = function(thisApi, cb) {
+    var api = this;
+    if (api.busy || api.updating){ 
       return;
     }
-    settings.busy = true;
-    request = settings.buildRequest();
+    api.busy = true;
+    api.updating = true;
+
+    //Callback
+    api.cb = cb || angular.noop;
+    //Defered
+    api.deferred = typeof cb !== 'function' ? $q.defer() : null; 
+
+    DS.update(api.resource, thisApi.id, thisApi)
+    .then(function(thisApi){
+      api.selected = thisApi;
+      utils.alert({location: 'system-alerts', color: 'success', title: api.resource, content: 'Updated Successfully', autoclose: 2000});
     
-    if(utils.development()){ console.log("SKIP:",settings.skip,"START:",settings.start,"END:",settings.end,"WHERE:",settings.criteria); };
-    
-    DS.findAll('setting', request)
-    .then(function(list){
-      settings.settings = _.union(settings.settings, list);
-      settings.visible = _.slice(settings.settings, settings.start, settings.end);
-      settings.skip = settings.skip + settings.limit;
+      if(api.deferred){
+        api.deferred.resolve(thisApi);
+      }
+      return api.cb(null, api.selected);
 
     })
-    .finally(function (request) {
-      console.log(request);
-
-      settings.busy = false;
+    .finally(function () {
+      api.busy = false;
+      api.updating = false;
     })
     .catch(function(err){
-      settings.error = err.status;
-      settings.message = err.data;
+      api.error = err.status;
+      api.message = err.data;
+      utils.alert({location: 'system-alerts', color: 'error', title: api.resource, content: 'Error Updating', autoclose: 2000});
+
+      if(api.deferred){
+        api.deferred.reject(err);
+      }
+      return api.cb(err);
     });
+
+    if(api.deferred){
+      return api.deferred.promise;
+    }
   }
 
-  Settings.prototype.init = function() {
-    var settings = this;
-    if (settings.busy){ 
+  /*
+   * Delete model object through API
+   * @param {Object} thisApi
+   * @param Function cb (optional)
+   */
+
+  Api.prototype.delete = function(thisApi, cb) {
+
+    var api = this;
+    if (api.busy || api.updating){ 
       return;
     }
+    api.busy = true;
+    api.updating = true;
 
-    settings.start = settings.skip;
-    settings.end = settings.skip + settings.limit;
-    
-    settings.search();
-  }
+    //Callback
+    api.cb = cb || angular.noop;
+    //Defered
+    api.deferred = typeof cb !== 'function' ? $q.defer() : null; 
 
-  Settings.prototype.infinite = function() {
-    var settings = this;
-    if (settings.busy){ 
-      return;
-    }
-
-    settings.start = 0;
-    settings.end = settings.skip + settings.limit;
-    
-    settings.search();
-
-  }
-
-  Settings.prototype.prevPage = function() {
-    var settings = this;
-    if (settings.busy){ 
-      return;
-    }
- 
-    settings.skip = settings.skip - settings.limit * 2 >= 0 ? settings.skip - settings.limit * 2 : 0;
-    settings.start = settings.skip;
-    settings.end = settings.skip + settings.limit;
-
-    settings.search();
-
-  }
-
-  Settings.prototype.nextPage = function() {
-    var settings = this;
-    
-    if (settings.busy){ 
-      return;
-    }
-
-    settings.start = settings.skip;
-    settings.end = settings.skip + settings.limit;
-    
-    settings.search();
-
-  }
-
-  Settings.prototype.reset = function(type) {
-    var settings = this;
-    if(type){
-       $location.search(type, settings[type]);
-    }
-
-    this.skip = 0;
-    this.init(); 
-  }
-  
-  return Settings;
-
- })
-;
-
-angular.module('humpback.core.roles', [])
-.factory('Roles', function(DS, utils, $location, Categories) {
-  
-  var Roles = function() {
-    this.visible    = [];
-    this.roles     = [];
-    this.busy       = false;
-    this.skip       = 0;
-    this.limit      = 10;
-    this.total      = 0;
-    this.pages      = 0;
-    this.start      = 0;
-    this.end        = 10;
-    this.criteria   = {};
-    this.sort       = 'createdAt desc';
-    this.error      = null;
-    this.message    = null;
-  };
-
-  Roles.prototype.buildRequest = function(){
-    var roles = this;
-
-    var request = {
-      limit: roles.limit,
-      skip: roles.skip,
-      sort: roles.sort
-    }
-    if(!_.isEmpty(roles.criteria)){
-      request.where = roles.criteria;
-    }
-    return request;
-  };
-
-  Roles.prototype.search = function() {
-    var roles = this, request;
-    
-    if (roles.busy){ 
-      return;
-    }
-    roles.busy = true;
-    request = roles.buildRequest();
-    
-    if(utils.development()){ console.log("SKIP:",roles.skip,"START:",roles.start,"END:",roles.end,"WHERE:",roles.criteria); };
-    
-    DS.findAll('role', request)
-    .then(function(list){
-      roles.roles = _.union(roles.roles, list);
-      roles.visible = _.slice(roles.roles, roles.start, roles.end);
-      roles.skip = roles.skip + roles.limit;
-
+    DS.destroy(api.resource, thisApi.id)
+    .then(function(thisApi){
+      api.selected = {};
+      utils.alert({location: 'system-alerts', color: 'success', title: api.resource, content: 'Deleted Successfully', autoclose: 2000});
+      
+      if(api.deferred){
+        api.deferred.resolve(api.selected);
+      }
+      return api.cb(null, api.selected);
     })
-    .finally(function (request) {
-      console.log(request);
-
-      roles.busy = false;
+    .finally(function () {
+      api.busy = false;
+      api.updating = false;
     })
     .catch(function(err){
-      roles.error = err.status;
-      roles.message = err.data;
+      api.error = err.status;
+      api.message = err.data;
+      utils.alert({location: 'system-alerts', color: 'error', title: api.resource, content: 'Error Deleting', autoclose: 2000});
+
+      if(api.deferred){
+        api.deferred.reject(err);
+      }
+      return api.cb(err);
     });
+
+    if(api.deferred){
+      return api.deferred.promise;
+    }
   }
 
-  Roles.prototype.init = function() {
-    var roles = this;
-    if (roles.busy){ 
-      return;
-    }
+  /* TODO
+   * Add model association object through API
+   * @param {Object} thisAssocApi
+   * @param Function cb (optional)
+   */
+  Api.prototype.add = function (thisAssocApi, cb) {
 
-    roles.start = roles.skip;
-    roles.end = roles.skip + roles.limit;
+  }
+
+  /* TODO
+   * Remove model association object through API
+   * @param {Object} thisAssocApi
+   * @param Function cb (optional)
+   */
+  Api.prototype.remove = function (thisAssocApi, cb) {
     
-    roles.search();
   }
 
-  Roles.prototype.infinite = function() {
-    var roles = this;
-    if (roles.busy){ 
-      return;
-    }
+  return Api;
 
-    roles.start = 0;
-    roles.end = roles.skip + roles.limit;
-    
-    roles.search();
-
-  }
-
-  Roles.prototype.prevPage = function() {
-    var roles = this;
-    if (roles.busy){ 
-      return;
-    }
- 
-    roles.skip = roles.skip - roles.limit * 2 >= 0 ? roles.skip - roles.limit * 2 : 0;
-    roles.start = roles.skip;
-    roles.end = roles.skip + roles.limit;
-
-    roles.search();
-
-  }
-
-  Roles.prototype.nextPage = function() {
-    var roles = this;
-    
-    if (roles.busy){ 
-      return;
-    }
-
-    roles.start = roles.skip;
-    roles.end = roles.skip + roles.limit;
-    
-    roles.search();
-
-  }
-
-  Roles.prototype.reset = function(type) {
-    var roles = this;
-    if(type){
-       $location.search(type, roles[type]);
-    }
-
-    this.skip = 0;
-    this.init(); 
-  }
-  
-  return Roles;
-
-
-})
-
-;
-
-angular.module('humpback.core.emails', [])
-
-.factory('Emails', function(DS, utils) {
-  
-  var Emails = function() {
-    this.visible    = [];
-    this.emails     = [];
-    this.busy       = false;
-    this.skip       = 0;
-    this.limit      = 10;
-    this.total      = 0;
-    this.pages      = 0;
-    this.start      = 0;
-    this.end        = 10;
-    this.criteria   = {};
-    this.sort       = 'createdAt desc';
-    this.error      = null;
-    this.message    = null;
-  };
-
-  Emails.prototype.buildRequest = function(){
-    var emails = this;
-
-    var request = {
-      limit: emails.limit,
-      skip: emails.skip,
-      sort: emails.sort
-    }
-    if(!_.isEmpty(emails.criteria)){
-      request.where = emails.criteria;
-    }
-    return request;
-  };
-
-  Emails.prototype.search = function() {
-    var emails = this, request;
-    
-    if (emails.busy){ 
-      return;
-    }
-    emails.busy = true;
-    request = emails.buildRequest();
-    
-    if(utils.development()){ console.log("SKIP:",emails.skip,"START:",emails.start,"END:",emails.end,"WHERE:",emails.criteria); };
-    
-    DS.findAll('email', request)
-    .then(function(list){
-      emails.emails = _.union(emails.emails, list);
-      emails.visible = _.slice(emails.emails, emails.start, emails.end);
-      emails.skip = emails.skip + emails.limit;
-
-    })
-    .finally(function (request) {
-      console.log(request);
-
-      emails.busy = false;
-    })
-    .catch(function(err){
-      emails.error = err.status;
-      emails.message = err.data;
-    });
-  }
-
-  Emails.prototype.init = function() {
-    var emails = this;
-    if (emails.busy){ 
-      return;
-    }
-
-    emails.start = emails.skip;
-    emails.end = emails.skip + emails.limit;
-    
-    emails.search();
-  }
-
-  Emails.prototype.infinite = function() {
-    var emails = this;
-    if (emails.busy){ 
-      return;
-    }
-
-    emails.start = 0;
-    emails.end = emails.skip + emails.limit;
-    
-    emails.search();
-
-  }
-
-  Emails.prototype.prevPage = function() {
-    var emails = this;
-    if (emails.busy){ 
-      return;
-    }
- 
-    emails.skip = emails.skip - emails.limit * 2 >= 0 ? emails.skip - emails.limit * 2 : 0;
-    emails.start = emails.skip;
-    emails.end = emails.skip + emails.limit;
-
-    emails.search();
-
-  }
-
-  Emails.prototype.nextPage = function() {
-    var emails = this;
-    
-    if (emails.busy){ 
-      return;
-    }
-
-    emails.start = emails.skip;
-    emails.end = emails.skip + emails.limit;
-    
-    emails.search();
-
-  }
-
-  Emails.prototype.reset = function(type) {
-    var emails = this;
-    if(type){
-       $location.search(type, emails[type]);
-    }
-
-    this.skip = 0;
-    this.init(); 
-  }
-  
-  return Emails;
-})
+});
 
 })( window, angular );
