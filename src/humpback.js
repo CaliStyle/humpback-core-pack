@@ -143,15 +143,21 @@ angular.module('humpback.core.api', [])
 
   /*
    * Api
-   * @param String resource
-   * @param Function cb
+   * @param {String} resource
+   * @param {Object} init
+   * @param {Function} cb
    */
-  var Api = function(resource, cb) {
+  var Api = function(resource, init, cb) {
+    
+    init = typeof init !== 'undefined' ? init : {}; 
     //Holds the models displayed
     this.visible = [];
     
     //Holds all models
     this.api = [];
+
+    //is selected model new?
+    this.isNew = false;
 
     //A single Selected model
     this.selected = {};
@@ -176,16 +182,16 @@ angular.module('humpback.core.api', [])
     //Amount of models to return 
     this.limit = 10;
 
-    //Total amount of models in collection
+    //Total amount of models in collection (Auto Resolves)
     this.total = 0;
 
-    //Total amount of pages collection / limit
+    //Total amount of pages collection / limit (Auto Resolves)
     this.pages = 0;
 
-    //Index of this.api to start adding models to this.visible 
+    //Index of this.api to start adding models to this.visible (Auto Resolves)
     this.start = 0;
     
-    //Index of this.api to stop adding models to this.visible
+    //Index of this.api to stop adding models to this.visible (Auto Resolves)
     this.end = 10;
     
     //Criteria to search for 
@@ -197,7 +203,7 @@ angular.module('humpback.core.api', [])
     //Sort this.visible
     this.sort = 'createdAt DESC';
     
-    //Angular sort this.visible
+    //Angular sort this.visible (Auto Resolves)
     this.angularSort = 'createdAt';
 
     //Api error codes
@@ -205,6 +211,11 @@ angular.module('humpback.core.api', [])
 
     //Api error message
     this.message = null;
+
+    for(var i in init){
+      this[i] = init[i];
+    }
+
   };
 
   /*
@@ -263,6 +274,8 @@ angular.module('humpback.core.api', [])
       api.api = _.union(api.api, list);
       api.visible = _.slice(api.api, api.start, api.end);
       api.skip = api.skip + api.limit;
+      api.error = null;
+      api.message = null;
 
       if(api.deferred){
         api.deferred.resolve(api.visible);
@@ -275,7 +288,7 @@ angular.module('humpback.core.api', [])
     })
     .catch(function(err){
       api.error = err.status;
-      api.message = err.data;
+      api.message = utils.handleError(err);
       
       if(api.deferred){
         api.deferred.reject(err);
@@ -429,7 +442,7 @@ angular.module('humpback.core.api', [])
     })
     .catch(function(err){
       api.error = err.status;
-      api.message = err.data;
+      api.message = utils.handleError(err);
 
       if(api.deferred){
         api.deferred.reject(err);
@@ -467,7 +480,8 @@ angular.module('humpback.core.api', [])
     .then(function(thisApi){
       api.selected = thisApi;
       utils.alert({location: 'system-alerts', color: 'success', title: api.resource, content: 'Created Successfully', autoclose: 2000});
-    
+      api.error = null;
+      api.message = null;
       if(api.deferred){
         api.deferred.resolve(api.selected);
       }
@@ -480,7 +494,7 @@ angular.module('humpback.core.api', [])
     })
     .catch(function(err){
       api.error = err.status;
-      api.message = err.data;
+      api.message = utils.handleError(err);
       utils.alert({location: 'system-alerts', color: 'error', title: api.resource, content: 'Error Creating', autoclose: 2000});
 
       if(api.deferred){
@@ -517,7 +531,9 @@ angular.module('humpback.core.api', [])
     .then(function(thisApi){
       api.selected = thisApi;
       utils.alert({location: 'system-alerts', color: 'success', title: api.resource, content: 'Updated Successfully', autoclose: 2000});
-    
+      api.error = null;
+      api.message = null;
+
       if(api.deferred){
         api.deferred.resolve(thisApi);
       }
@@ -530,7 +546,7 @@ angular.module('humpback.core.api', [])
     })
     .catch(function(err){
       api.error = err.status;
-      api.message = err.data;
+      api.message = utils.handleError(err);
       utils.alert({location: 'system-alerts', color: 'error', title: api.resource, content: 'Error Updating', autoclose: 2000});
 
       if(api.deferred){
@@ -568,7 +584,9 @@ angular.module('humpback.core.api', [])
     .then(function(thisApi){
       api.selected = {};
       utils.alert({location: 'system-alerts', color: 'success', title: api.resource, content: 'Deleted Successfully', autoclose: 2000});
-      
+      api.error = null;
+      api.message = null;
+
       if(api.deferred){
         api.deferred.resolve(api.selected);
       }
@@ -580,7 +598,7 @@ angular.module('humpback.core.api', [])
     })
     .catch(function(err){
       api.error = err.status;
-      api.message = err.data;
+      api.message = utils.handleError(err);
       utils.alert({location: 'system-alerts', color: 'error', title: api.resource, content: 'Error Deleting', autoclose: 2000});
 
       if(api.deferred){
