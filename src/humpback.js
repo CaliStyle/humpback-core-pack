@@ -136,6 +136,41 @@ angular.module('humpback.core.cms', [])
   }
 
   return CMS;
+})
+
+.directive("ngCms", function ($compile, $templateCache) {
+    return {  
+      restrict: 'A',
+      replace: true,
+      terminal: true,
+      priority: 1000,
+      scope: {
+          cms: '=ngCms',
+      },
+        
+      link: function (scope, elem, attrs, ctrl) {
+          //console.log(scope.cms);
+
+        scope.$watch("cms", function(newVal){
+          if(typeof scope.cms.id !== 'undefined'){
+            
+            var templateUrl = scope.cms.id+'.html';
+
+            $templateCache.put(templateUrl, scope.cms.content);
+            
+            if ($templateCache.get(templateUrl)) {
+              // template is on the page
+              console.log(templateUrl + ' success!', scope.cms.content);
+                
+              var element = angular.element(elem);
+              var html = '<div ng-include src="\''+templateUrl+'\'"></div>';  
+              element.empty().append($compile(html)(scope.$parent));
+
+            }
+          }
+        });
+      }
+    };
 });
 
 angular.module('humpback.core.api', [])
@@ -159,11 +194,17 @@ angular.module('humpback.core.api', [])
     //is selected model new?
     this.isNew = false;
 
+    //Show a site-alert when model is created, updated, or deleted?
+    this.showAlert = true;
+
     //A single Selected model
     this.selected = {};
     
     //Type of model
     this.resource = resource;
+
+    //Store the model;
+    this.model = {};
 
     //Callback
     this.cb = cb || angular.noop;
@@ -200,11 +241,14 @@ angular.module('humpback.core.api', [])
     //Model Api options
     this.options = {};
 
+    //Filter for Search
+    this.filter = ['',''];
+
     //Sort this.visible
-    this.sort = 'createdAt DESC';
+    this.sort = 'createdAt ASC';
     
     //Angular sort this.visible (Auto Resolves)
-    this.angularSort = 'createdAt';
+    this.angularSort = '-createdAt';
 
     //Api error codes
     this.error = null;
@@ -223,12 +267,12 @@ angular.module('humpback.core.api', [])
    */
   Api.prototype._handleSort = function(){
       var api = this, part1 = null, part2 = null;
-      var sortPieces = this.sort.split(" ");
+      var sortPieces = this.sort.split(' ');
 
       part1 = sortPieces[0];
       if(sortPieces[1] === 'DESC'){
         part2 = '';
-      }else{
+      }else if (sortPieces[1] === 'ASC'){
         part2 = '-';
       }
       return api.angularSort = part2+part1;
@@ -245,6 +289,7 @@ angular.module('humpback.core.api', [])
       skip: api.skip,
       sort: api.sort
     }
+
     if(!_.isEmpty(api.criteria)){
       request.where = api.criteria;
     }
@@ -269,11 +314,24 @@ angular.module('humpback.core.api', [])
     if(utils.development()){ console.log("SKIP:",api.skip,"START:",api.start,"END:",api.end,"WHERE:",api.criteria,"OPTIONS:",api.options); };
     
     DS.findAll(api.resource, request, api.options)
-    .then(function(list){
+    .then(function (list) { 
+
+      //console.log(DS.model(api.resource));
+      //console.log(DS.definitions[api.resource].meta.contentCount);
 
       api.api = _.union(api.api, list);
-      api.visible = _.slice(api.api, api.start, api.end);
+      if(api.options.useFilter){
+        api.visible = list;
+      }else{
+        api.visible = _.slice(api.api, api.start, api.end);  
+      }
       api.skip = api.skip + api.limit;
+    
+      if(DS.definitions[api.resource]){
+        api.total = DS.definitions[api.resource].meta.contentCount;
+        api.pages = api.total / api.limit < 0 ? 1 : api.total / api.limit;
+      }
+
       api.error = null;
       api.message = null;
 
@@ -396,15 +454,60 @@ angular.module('humpback.core.api', [])
   Api.prototype.reset = function(type, cb) {
     var api = this;
     if(type){
-       $location.search(type, api[type]);
+      //api[type] = typeof api[type] === 'object' ? JSON.stringify(api[type]) : api[type];
+      $location.search(type, api[type]);
     }
     //Callback
     api.cb = cb || angular.noop;
     //Defered
     api.deferred = typeof cb !== 'function' ? $q.defer() : null; 
+    api.skip = 0;
+    api.init(cb); 
+  }
 
-    this.skip = 0;
-    this.init(cb); 
+  /**
+   * Apply the filter from api.filter
+   */
+  Api.prototype.addFilter = function(){
+    var api = this;
+    
+    api.options = _.merge({}, api.options, {bypassCache: true, useFilter: true});
+
+    if(api.filter[0] !== '' && api.filter[1] !== ''){
+      api.criteria = api.criteria ? api.criteria : {};
+      api.criteria[api.filter[0]] = { 
+        'contains' : api.filter[1] 
+      };
+    }
+
+    return api.reset();
+  }
+
+  /**
+   * Remove a filter
+   * @param {String} filter 
+   */
+  Api.prototype.removeFilter = function(filter){
+    var api = this;
+    api.options = _.merge({}, api.options, {bypassCache: true, useFilter: true});
+    
+    delete api.criteria[filter];
+
+    return api.reset();
+  }
+
+  /**
+   * Clear all filters in api.criteria
+   */
+  Api.prototype.clearFilters = function(){
+    
+    var api = this;
+    api.options = _.merge({}, api.options, {bypassCache: true, useFilter: true});
+    
+    api.filter = ['','']; 
+    api.criteria = {};
+
+    return api.reset();
   }
 
   /*
@@ -428,9 +531,10 @@ angular.module('humpback.core.api', [])
 
     DS.find(api.resource, id, api.options)
     .then(function(thisApi){
-      
+      //Set selected Model
       api.selected = thisApi;
 
+      //If is a promise
       if(api.deferred){
         api.deferred.resolve(api.selected);
       }
@@ -478,31 +582,49 @@ angular.module('humpback.core.api', [])
 
     DS.create(api.resource, thisApi)
     .then(function(thisApi){
+      //Set the selected model
       api.selected = thisApi;
-      utils.alert({location: 'system-alerts', color: 'success', title: api.resource, content: 'Created Successfully', autoclose: 2000});
+      
+      //Show site-alert
+      if(api.showAlert){
+        utils.alert({location: 'system-alerts', color: 'success', title: api.resource, content: 'Created Successfully', autoclose: 2000});
+      }
+
+      //Reset error and message to null
       api.error = null;
       api.message = null;
+
+      //if is a promise
       if(api.deferred){
         api.deferred.resolve(api.selected);
       }
+      //if is a callback
       return api.cb(null, api.selected);
 
     })
     .finally(function () {
+      //reset loading states
       api.busy = false;
       api.updating = false;
     })
     .catch(function(err){
+      //set error
       api.error = err.status;
       api.message = utils.handleError(err);
-      utils.alert({location: 'system-alerts', color: 'error', title: api.resource, content: 'Error Creating', autoclose: 2000});
-
+      
+      //show site-alert
+      if(api.showAlert){
+        utils.alert({location: 'system-alerts', color: 'error', title: api.resource, content: 'Error Creating', autoclose: 2000});
+      }
+      //If is a promise
       if(api.deferred){
         api.deferred.reject(err);
       }
+      //if is a callback
       return api.cb(err);
     });
 
+    //if is a promise
     if(api.deferred){
       return api.deferred.promise;
     }
@@ -529,32 +651,50 @@ angular.module('humpback.core.api', [])
 
     DS.update(api.resource, thisApi.id, thisApi)
     .then(function(thisApi){
+
+      //Set the selected model
       api.selected = thisApi;
-      utils.alert({location: 'system-alerts', color: 'success', title: api.resource, content: 'Updated Successfully', autoclose: 2000});
+      
+      //show site-alert
+      if(api.showAlert){
+        utils.alert({location: 'system-alerts', color: 'success', title: api.resource, content: 'Updated Successfully', autoclose: 2000});
+      }
+
+      //reset error and message to null
       api.error = null;
       api.message = null;
 
+      //If is a promise
       if(api.deferred){
         api.deferred.resolve(thisApi);
       }
+      //If is a callback
       return api.cb(null, api.selected);
 
     })
     .finally(function () {
+      //Reset the loading state
       api.busy = false;
       api.updating = false;
     })
     .catch(function(err){
+      //Set error
       api.error = err.status;
       api.message = utils.handleError(err);
-      utils.alert({location: 'system-alerts', color: 'error', title: api.resource, content: 'Error Updating', autoclose: 2000});
-
+      
+      //Show site-alert
+      if(api.showAlert){
+        utils.alert({location: 'system-alerts', color: 'error', title: api.resource, content: 'Error Updating', autoclose: 2000});
+      }
+      //If is a promise
       if(api.deferred){
         api.deferred.reject(err);
       }
+      //If is a callback
       return api.cb(err);
     });
 
+    //If is a promise
     if(api.deferred){
       return api.deferred.promise;
     }
@@ -572,6 +712,7 @@ angular.module('humpback.core.api', [])
     if (api.busy || api.updating){ 
       return;
     }
+    //Set loading states
     api.busy = true;
     api.updating = true;
 
@@ -582,31 +723,47 @@ angular.module('humpback.core.api', [])
 
     DS.destroy(api.resource, thisApi.id)
     .then(function(thisApi){
+      //Unset selected model
       api.selected = {};
-      utils.alert({location: 'system-alerts', color: 'success', title: api.resource, content: 'Deleted Successfully', autoclose: 2000});
+      
+      //Show site-alert
+      if(api.showAlert){
+        utils.alert({location: 'system-alerts', color: 'success', title: api.resource, content: 'Deleted Successfully', autoclose: 2000});
+      }
+      //Reset error and message to null
       api.error = null;
       api.message = null;
 
+      //If is a promise
       if(api.deferred){
         api.deferred.resolve(api.selected);
       }
+      //If is a callback
       return api.cb(null, api.selected);
     })
     .finally(function () {
+      //Reset loading states
       api.busy = false;
       api.updating = false;
     })
     .catch(function(err){
+      //Set error
       api.error = err.status;
       api.message = utils.handleError(err);
-      utils.alert({location: 'system-alerts', color: 'error', title: api.resource, content: 'Error Deleting', autoclose: 2000});
-
+      
+      //Show site-alert
+      if(api.showAlert){
+        utils.alert({location: 'system-alerts', color: 'error', title: api.resource, content: 'Error Deleting', autoclose: 2000});
+      }
+      //If is a promise
       if(api.deferred){
         api.deferred.reject(err);
       }
+      //If is a callback
       return api.cb(err);
     });
 
+    //If is a promise
     if(api.deferred){
       return api.deferred.promise;
     }
