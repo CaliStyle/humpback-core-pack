@@ -19,6 +19,7 @@ angular.module('humpback.core', [
   'ngSanitize',
 
   'humpback.core.cms',
+  'humpback.core.input',
   'humpback.core.paging',
   'humpback.core.api'
   
@@ -199,7 +200,8 @@ angular.module('humpback.core.cms', [])
  * @element EA
  *
  */
-angular.module('humpback.core.paging', []).directive('paging', function () {
+angular.module('humpback.core.paging', [])
+.directive('paging', function () {
 
     /**
     * The angular return value required for the directive
@@ -567,8 +569,162 @@ angular.module('humpback.core.paging', []).directive('paging', function () {
         addPrevNext(scope, pageCount, 'next');
     }
 
-
 });
+
+/**
+ * @ngDoc directive
+ * @name ng.directive:ngApiInput
+ *
+ * @description
+ * A directive to aid deciphering model attributes for the correct input
+ *
+ * @element EA
+ *
+ */
+angular.module('humpback.core.input', [])
+.directive('ngApiInput', ['$compile', function ($compile) {
+    var getTemplate = function(model, type, collection) {
+      
+      var required = '', 
+          disabled='',
+          unique='';
+
+      if(collection.required){
+        required = ' required';
+      }
+      if(collection.unique){
+        unique = 'unique';
+      }
+      if(type === 'string' && collection.enum){
+        type = type + '-enum';
+      }
+
+      switch (type) {
+        
+        case 'string': 
+          return    '<label for="{{apiLabel}}">{{ apiLabel }}</label>'
+                  + '<input id="{{apiLabel}}" type="text" ng-model="apiInput"'+required+'>';
+
+        case 'text': 
+          return    '<label for="{{apiLabel}}">{{ apiLabel }}</label>'
+                  + '<input id="{{apiLabel}}" type="text" ng-model="apiInput"'+required+'>';    
+
+        case 'string-enum': 
+          return    '<label for="{{apiLabel}}">{{ apiLabel }}</label>'
+                  + '<input id="{{apiLabel}}" type="text" ng-model="apiInput"'+required+'>';
+
+        case 'integer': 
+          return    '<label for="{{apiLabel}}">{{ apiLabel }}</label>'
+                  + '<input id="{{apiLabel}}" type="number" ng-model="apiInput"'+required+'>';
+
+        case 'float': 
+          return    '<label for="{{apiLabel}}">{{ apiLabel }}</label>'
+                  + '<input id="{{apiLabel}}" type="float" ng-model="apiInput"'+required+'>';
+        
+        case 'email': 
+          return    '<label for="{{apiLabel}}">{{ apiLabel }}</label>'
+                  + '<input id="{{apiLabel}}" type="email" ng-model="apiInput"'+required+'>';
+
+        case 'boolean': 
+          return    '<label for="{{apiLabel}}">{{ apiLabel }}</label>'
+                  + '<select id="{{apiLabel}}" ng-model="apiInput">'
+                  +   '<option value="true">True</option>'
+                  +   '<option value="false">False</option>'
+                  + '</select>';
+
+        case 'date': 
+          return    '<label for="{{apiLabel}}">{{ apiLabel }}</label>';
+
+        case 'datetime': 
+          return    '<label for="{{apiLabel}}">{{ apiLabel }}</label>';
+
+        case 'binary': 
+          return    '<label for="{{apiLabel}}">{{ apiLabel }}</label>';
+
+        case 'array': 
+          return    '<label for="{{apiLabel}}">{{ apiLabel }}</label>';
+
+        case 'json': 
+          return    '<label for="{{apiLabel}}">{{ apiLabel }}</label>';
+
+        case 'model': 
+          return    '<label>{{ apiLabel }}</label>'
+                  + '<div ng-api-populate="ngApiInput.model" populate-id="apiInput">{{ ngApiInput.model }} Model {{ apiInput }}</div>';
+
+        case 'collection': 
+          return    '<label>{{ apiLabel }}</label>'
+                  + '<div ng-api-collection="{{ ngApiInput.collection }}">{{ ngApiInput.collection }} Collection via {{ ngApiInput.via }}</div>';
+
+        default:  
+          return    '<label>{{ apiLabel }}</label>'
+                  + '<input type="text" ng-model="apiInput"'+required+'>';
+      }
+    }
+
+    return {
+      restrict: 'AE',
+      transclude: true,
+      scope: {
+          ngApiInput: '=',
+          apiModel: '=',
+          apiLabel: '=',
+          apiInput: '='
+      },
+
+      link: function(scope, element, attrs) {
+           
+        var type = 'string', 
+            collection = {},
+            model = {};
+
+        if(scope.ngApiInput.collection){
+          type = 'collection';
+          collection = scope.ngApiInput;
+        }
+        else if(scope.ngApiInput.model){
+          type = 'model';
+          collection = scope.ngApiInput;
+        }
+        else{
+          type = scope.ngApiInput.type;
+          collection = scope.ngApiInput;
+        }
+        model = scope.apiModel;
+
+        var el = $compile(getTemplate(model, type, collection))(scope);
+        element.replaceWith(el);
+
+      }
+    };
+}])
+/*
+.directive('ngApiPopulate', ['$compile','Api', function ($compile, Api) {
+  return {
+    restrict: 'AE',
+    transclude: true,
+    scope: {
+        ngApiPopulate: '=',
+        populateId: '='
+    },
+    link: function(scope, element, attrs) {
+      
+      console.log(scope.ngApiPopulate, scope.populateId);
+      
+      scope.model = new Api(scope.ngApiPopulate);
+      
+      scope.model.read(scope.populateId)
+      .then(function(thismodel){
+        console.log(thismodel);
+
+        var el = $compile(thismodel)(scope);
+        element.replaceWith(el);
+      });
+
+    }
+  };
+}])
+*/
+;
 
 angular.module('humpback.core.api', [])
 .factory('Api', function(DS, utils, $location, $q) {
@@ -613,6 +769,9 @@ angular.module('humpback.core.api', [])
     
     //If api updating
     this.updating = false;
+
+    //If api updating
+    this.deleting = false;
     
     //Amount of models to skip
     this.skip = 0;
@@ -631,6 +790,9 @@ angular.module('humpback.core.api', [])
     
     //Index of this.api to stop adding models to this.visible (Auto Resolves)
     this.end = 10;
+
+    //If this is triggered by infinite scrolling
+    this.infinite = false;
     
     //Criteria to search for 
     this.criteria = {};
@@ -655,6 +817,12 @@ angular.module('humpback.core.api', [])
 
     for(var i in init){
       this[i] = init[i];
+    }
+
+    if(init.page){
+      this.skip = this.limit * init.page - this.limit;
+      this.start = this.skip;
+      this.end = this.start + this.limit;
     }
 
   };
@@ -717,16 +885,17 @@ angular.module('humpback.core.api', [])
       //console.log(DS.definitions[api.resource].meta.contentCount);
 
       api.api = _.union(api.api, list);
-      if(api.options.useFilter){
+      if(api.options.useFilter || !api.infinite){
         api.visible = list;
       }else{
         api.visible = _.slice(api.api, api.start, api.end);  
       }
+      
       api.skip = api.skip + api.limit;
+      api.page =  Math.ceil(api.start / api.limit) + 1;
     
       if(DS.definitions[api.resource]){
         api.total = DS.definitions[api.resource].meta.contentCount;
-        api.page =  Math.ceil(api.start / api.limit) + 1;
       }
 
       api.error = null;
@@ -774,6 +943,7 @@ angular.module('humpback.core.api', [])
 
     api.start = api.skip;
     api.end = api.skip + api.limit;
+    api.page =  Math.ceil(api.start / api.limit) + 1;
     
     return api.search(cb);
   }
@@ -793,6 +963,7 @@ angular.module('humpback.core.api', [])
     //Defered
     api.deferred = typeof cb !== 'function' ? $q.defer() : null; 
 
+    api.infinite = true;
     api.start = 0;
     api.end = api.skip + api.limit;
     
@@ -817,9 +988,11 @@ angular.module('humpback.core.api', [])
     api.skip = api.skip - api.limit * 2 >= 0 ? api.skip - api.limit * 2 : 0;
     api.start = api.skip;
     api.end = api.skip + api.limit;
+    api.page = api.page - 1 > 0 ? api.page - 1 : 1;
+
+    $location.search('page', api.page);
 
     return api.search(cb);
-
   }
   
   /*
@@ -838,14 +1011,23 @@ angular.module('humpback.core.api', [])
 
     api.start = api.skip;
     api.end = api.skip + api.limit;
+    api.page = api.page + 1;
+
+    $location.search('page', api.page);
     
     return api.search(cb);
 
   }
 
-
+  /*
+   * Paging 
+   * @param {String} text
+   * @param {Integer} page
+   * @param {Integer} pageSize
+   * @param {Integer} total
+   * @param {Function} cb (optional)
+   */
   Api.prototype.paging = function(text, page, pageSize, total, cb){
-    console.log({text, page, pageSize, total});
     
     var api = this;
     if (api.busy){ 
@@ -861,6 +1043,8 @@ angular.module('humpback.core.api', [])
     api.start = api.skip;
     api.end = api.start + api.limit;
     
+    $location.search('page', page);
+
     return api.search(api.cb);
   };
 
@@ -1056,7 +1240,7 @@ angular.module('humpback.core.api', [])
 
   Api.prototype.update = function(thisApi, cb) {
     var api = this;
-    if (api.busy || api.updating){ 
+    if (api.busy || api.updating || api.deleting){ 
       return;
     }
     api.busy = true;
@@ -1127,12 +1311,12 @@ angular.module('humpback.core.api', [])
   Api.prototype.delete = function(thisApi, cb) {
 
     var api = this;
-    if (api.busy || api.updating){ 
+    if (api.busy || api.updating || api.deleting){ 
       return;
     }
     //Set loading states
     api.busy = true;
-    api.updating = true;
+    api.deleting = true;
 
     //Callback
     api.cb = cb || angular.noop;
@@ -1162,7 +1346,7 @@ angular.module('humpback.core.api', [])
     .finally(function () {
       //Reset loading states
       api.busy = false;
-      api.updating = false;
+      api.deleting = false;
     })
     .catch(function(err){
       //Set error
