@@ -174,7 +174,7 @@ angular.module('humpback.core.cms', [])
             
             if ($templateCache.get(templateUrl)) {
               // template is on the page
-              console.log(templateUrl + ' success!', scope.cms.content);
+              //console.log(templateUrl + ' success!', scope.cms.content);
                 
               var element = angular.element(elem);
               var html = '<div ng-include src="\''+templateUrl+'\'"></div>';  
@@ -1182,7 +1182,7 @@ angular.module('humpback.core.api', [])
     //Defered
     api.deferred = typeof cb !== 'function' ? $q.defer() : null; 
 
-    DS.create(api.resource, thisApi)
+    DS.create(api.resource, thisApi, api.options)
     .then(function(thisApi){
       //Set the selected model
       api.selected = thisApi;
@@ -1251,7 +1251,7 @@ angular.module('humpback.core.api', [])
     //Defered
     api.deferred = typeof cb !== 'function' ? $q.defer() : null; 
 
-    DS.update(api.resource, thisApi.id, thisApi)
+    DS.update(api.resource, thisApi.id, thisApi, api.options)
     .then(function(thisApi){
 
       //Set the selected model
@@ -1323,7 +1323,7 @@ angular.module('humpback.core.api', [])
     //Defered
     api.deferred = typeof cb !== 'function' ? $q.defer() : null; 
 
-    DS.destroy(api.resource, thisApi.id)
+    DS.destroy(api.resource, thisApi.id, api.options)
     .then(function(thisApi){
       //Unset selected model
       api.selected = {};
