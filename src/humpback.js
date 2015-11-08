@@ -25,7 +25,144 @@ angular.module('humpback.core', [
   
 ]);
 
-angular.module('humpback.core.cms', [])
+angular.module('humpback.core.cms', ['ui.router'])
+.run(['$rootScope', 'Cms', '$state','$stateParams', '$q', 'Api', 'CMS', 'utils', function ($rootScope, Cms, $state, $stateParams, $q, Api, CMS, utils) {
+    
+    $rootScope.__route = new Api('route'); 
+    $rootScope.__cms = new CMS();
+
+    $rootScope.$state = $state;
+    $rootScope.$stateParams = $stateParams;
+
+    $rootScope.$on('$stateChangeStart',function (event, toState, toParams, fromState, fromParams) {
+        
+        var addr = $state.href(toState, toParams, {absolute: false}),
+            id = btoa('get:' + addr),
+            cont = true,
+            redirectTo = false;
+
+        $rootScope.__loadingRoute = true;
+        window.prerenderReady = false;
+        
+        if (toState.$$finishCms) {
+            return;
+        }
+
+        
+
+        if(window._barnacles.cms){
+            //Prevent the default Change until after the CMS resolves
+            event.preventDefault();
+            toState = angular.extend({'$$finishCms': true}, toState);
+
+            $rootScope.__route.read(id)
+            .then(function(thisroute){
+                
+                if (!$rootScope.$broadcast('$stateChangeStart', toState, toParams, fromState, fromParams).defaultPrevented) {
+                    //Set the page elements
+                    $rootScope.__cms.setPage(thisroute);
+                    //Set page URL for OG
+                    $rootScope.__cms.setUrl($state.href(toState, toParams, {absolute: true}));
+                }
+
+            })
+            .catch(function(err){
+                
+                switch(err.status) {
+                    case 404:
+                        //Handle 404
+                        //A 404 means we could not find the route in the DB, there it has no permissions
+                        utils.development("ROUTE: " + 404);
+                        $rootScope.$broadcast('$stateChangeCmsNotFound', toState, toParams);
+                        break;
+                    case 401:
+                        //Handle 401
+                        //A 401 means the route is unauthorized
+                        utils.development("ROUTE: " + 401);
+                        $rootScope.$broadcast('$stateChangeCmsUnauthorized', toState, toParams);
+                        redirectTo = 'fourZeroOne';
+                        cont = false;
+                        break;
+                    case 403:
+                        //Handle 403
+                        //A 403 means the route is forbidden
+                        utils.development("ROUTE: " + 403);
+                        $rootScope.$broadcast('$stateChangeCmsForbidden', toState, toParams);
+                        redirectTo = 'fourZeroThree';
+                        cont = false;
+                        break;
+                    case 500:
+                        //Handle 500
+                        //A 500 means this broke something
+                        utils.development("ROUTE: " + 500);
+                        $rootScope.$broadcast('$stateChangeCmsError', toState, toParams);
+                        redirectTo = 'fiveZeroZero';
+                        cont = false;
+                        break;
+                    default:
+                        //Default
+                        //We aren't quite sure what went wrong
+                        utils.development("ROUTE ERROR");
+                }
+            })
+            .finally(function(){
+                
+                if ($rootScope.$broadcast('$stateChangeCmsStart', toState, toParams).defaultPrevented) {
+                    return;
+                }
+                
+                if (!cont || redirectTo){
+                    utils.development("Redirect: " + redirectTo);
+                    $state.go(redirectTo, toParams);
+                    return;
+                }
+                
+                
+                $rootScope.$broadcast('$stateChangeCmsAccepted', toState, toParams);
+
+                $state.go(toState.name, toParams, {notify: false})
+                .then(function() {
+                    $rootScope.$broadcast('$stateChangeSuccess', toState, toParams, fromState, fromParams);
+                });
+
+            });
+        }        
+    });
+
+    $rootScope.$on('$stateChangeSuccess', function (event, toState, toParams, fromState, fromParams) { 
+
+        $rootScope.__loadingRoute = false;
+        window.prerenderReady = true;
+
+    });
+
+}])
+.provider('Cms', function () {
+    this.$get = ['$q', function ($q) {
+        var Cms = {
+           /* 
+            _promiseify: function (value) {
+
+                //Converts a value into a promise, if the value is truthy it resolves it, otherwise it rejects it
+            
+                if (value && angular.isFunction(value.then)) {
+                  return value;
+                }
+
+                var deferred = $q.defer();
+                if (value) {
+                  deferred.resolve();
+                } else {
+                  deferred.reject();
+                }
+                return deferred.promise;
+            }
+        */
+        };
+
+        return Cms;
+    }];
+})
 .factory('CMS', function($document, $rootElement) {
   
   var CMS = function(){
@@ -49,7 +186,11 @@ angular.module('humpback.core.cms', [])
 
   CMS.prototype.setTitle = function(t) {
     if (this.suffix !== "") {
-      this.title = t + this.suffix;
+        if(!t){
+            this.title = this.suffix;
+        }else{
+            this.title = t + this.suffix;      
+        }
     } else {
       this.title = t;
     }
@@ -727,7 +868,7 @@ angular.module('humpback.core.input', [])
 ;
 
 angular.module('humpback.core.api', [])
-.factory('Api', function(DS, utils, $location, $q) {
+.factory('Api', function(DS, utils, $location, $q, $sailsSocket) {
 
   /*
    * Api
@@ -1110,6 +1251,123 @@ angular.module('humpback.core.api', [])
     api.criteria = {};
 
     return api.reset();
+  }
+
+
+  /*
+   * Get model object from the API
+   * @param String endpoint
+   * @param Function cb (optional)
+   */
+
+  Api.prototype.get = function(endpoint, cb) {
+    var api = this;
+    
+    if (api.busy || api.updating){ 
+      return;
+    }
+    api.busy = true;
+
+    //Callback
+    api.cb = cb || angular.noop;
+    //Defered
+    api.deferred = typeof cb !== 'function' ? $q.defer() : null;
+    
+    var finalEndpoint = endpoint ? window._prefix + endpoint : window._prefix + api.options.endpoint; 
+    
+    $sailsSocket.get(finalEndpoint)
+    .success(function(data, status, headers, config){
+            
+        api.busy = false;  
+        if(data.id){
+            api.selected = DS.inject(api.resource, data);
+        }else{
+            api.selected = data;
+        }
+
+        //If is a promise
+        if(api.deferred){
+            api.deferred.resolve(api.selected);
+        }
+        return api.cb(null, api.selected);
+
+    })
+    .error(function(data, status, headers, config){
+        
+        api.busy = false;
+
+        api.error = status;
+        api.message = utils.handleError(data);
+
+        if(api.deferred){
+            api.deferred.reject(data);
+        }
+        return api.cb(data);
+    });
+    
+    if(api.deferred){
+      return api.deferred.promise;
+    }
+
+  }
+
+
+  /*
+   * Post model object to the API
+   * @param String id
+   * @param Function cb (optional)
+   */
+
+  Api.prototype.post = function(endpoint, cb) {
+    var api = this;
+    
+    if (api.busy || api.updating){ 
+      return;
+    }
+    api.busy = true;
+
+    //Callback
+    api.cb = cb || angular.noop;
+    //Defered
+    api.deferred = typeof cb !== 'function' ? $q.defer() : null;
+    
+    var finalEndpoint = endpoint ? window._prefix + endpoint : window._prefix + api.options.endpoint; 
+    
+    $sailsSocket.post(finalEndpoint, api.selected)
+    .success(function(data, status, headers, config){
+            
+        api.busy = false;  
+        if(data.id){
+            api.selected = DS.inject(api.resource, data);
+        }else{
+            api.selected = data;
+        }
+        
+
+        //If is a promise
+        if(api.deferred){
+            api.deferred.resolve(api.selected);
+        }
+        return api.cb(null, api.selected);
+
+    })
+    .error(function(data, status, headers, config){
+        
+        api.busy = false;
+
+        api.error = status;
+        api.message = utils.handleError(data);
+
+        if(api.deferred){
+            api.deferred.reject(data);
+        }
+        return api.cb(data);
+    });
+    
+    if(api.deferred){
+      return api.deferred.promise;
+    }
+
   }
 
   /*
