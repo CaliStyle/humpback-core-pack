@@ -37,3 +37,34 @@ Allows pagination, filtering, and more!
 	})
 	...
 ```
+
+```js
+	...
+	.controller( 'PortfolioPieceCtrl', function PortfolioPieceController( $scope, $stateParams DS, Api ) {
+		
+		//Initiate the Api
+		$scope.portfolio = new Api('portfolio', {
+			options: {
+				params: {
+					//Populate a collection
+					populate: 'images'
+				}
+			}
+		});
+
+		//Set this so it's never empty
+		$scope.thisportfolio = $scope.portfolio.selected;
+
+		//Read from the Api
+		$scope.portfolio.read($stateParams.id)
+		.then(function(thisportfolio){
+			utils.development(thissku);
+		});
+
+		//Bind thisportfolio so that it updates from incoming sockets requests.
+		DS.bindOne('portfolio', $stateParams.id, $scope, 'thisportfolio');
+	})
+	...
+
+```
+

@@ -133,6 +133,8 @@ angular.module('humpback.core.cms', ['ui.router'])
 
         $rootScope.__loadingRoute = false;
         window.prerenderReady = true;
+        $rootScope.__currentState = toState.name;
+        $rootScope.__currentParams = toParams;
 
     });
 
