@@ -17,6 +17,7 @@ angular.module('humpback.core', [
   'ngTagsInput',
   'ui.ace',
   'ngSanitize',
+  'ngFileUpload',
 
   'humpback.core.cms',
   'humpback.core.input',
@@ -870,7 +871,7 @@ angular.module('humpback.core.input', [])
 ;
 
 angular.module('humpback.core.api', [])
-.factory('Api', function(DS, utils, $location, $q, $sailsSocket) {
+.factory('Api', function(DS, utils, $location, $q, $sailsSocket, $timeout, Upload) {
 
   /*
    * Api
@@ -957,6 +958,10 @@ angular.module('humpback.core.api', [])
 
     //Api error message
     this.message = null;
+
+    //File Upload
+    this.progress = 0;
+    this.files = [];
 
     for(var i in init){
       this[i] = init[i];
@@ -1629,6 +1634,80 @@ angular.module('humpback.core.api', [])
     if(api.deferred){
       return api.deferred.promise;
     }
+  }
+
+
+  Api.prototype.upload = function(endpoint, cb) {
+    var api = this;
+    
+    if (api.busy || api.updating){ 
+      return;
+    }
+    api.busy = true;
+
+    //Callback
+    api.cb = cb || angular.noop;
+    //Defered
+    api.deferred = typeof cb !== 'function' ? $q.defer() : null;
+    
+    var finalEndpoint = endpoint ? window._prefix + endpoint : window._prefix + api.options.endpoint; 
+    
+    var progress = function(){
+        var done = 0;
+        var progress = 0;
+        
+        for (var i = 0; i < api.files.length; i++) {
+            var file = api.files[i];
+            if(file.$complete){
+                done = done + 1;
+            }
+            progress = progress + file.$progressPercentage;
+        }
+        api.progress = progress / api.files.length;
+
+        if(done === api.files.length){
+            api.busy = false;
+            if(api.deferred){
+                api.deferred.resolve(api.files);
+            }
+            return api.cb(null, api.files);
+        }
+    }
+
+
+    if (api.files && api.files.length) {
+        for (var i = 0; i < api.files.length; i++) {
+            var file = api.files[i];
+            console.log(file);
+            if (!file.$error) {
+                Upload.upload({
+                    url: finalEndpoint,
+                    data: {
+                        file: file  
+                    }
+                })
+                .progress(function (evt) {
+                    file.$progressPercentage = parseInt(100.0 * evt.loaded / evt.total);
+                    file.$log = 'progress: ' + file.$progressPercentage + '% ' + evt.config.data.file.name + '\n' + file.$log;
+                    file.$complete = false;
+                    progress();
+                })
+                .success(function (data, status, headers, config) {
+                    $timeout(function() {
+                        file.$progressPercentage = 100;
+                        file.$log = 'file: ' + config.data.file.name + ', Response: ' + JSON.stringify(data) + '\n' + file.$log;
+                        file.$complete = true;
+                        progress();
+                    });
+                });
+            }
+        }
+    }
+    
+    if(api.deferred){
+      return api.deferred.promise;
+    }
+
   }
 
   /* TODO
