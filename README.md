@@ -12,6 +12,7 @@ from the database.
 Works with JS-data to make an easy and reusable resource system.
 Allows pagination, filtering, and more!
 
+##Search Example
 ```js
 	...
 	.controller( 'PortfolioCtrl', function PortfolioController( $scope, DS, Api ) {
@@ -37,7 +38,39 @@ Allows pagination, filtering, and more!
 	})
 	...
 ```
+##Create Item example
+```js
+	...
+	.controller( 'PortfolioPieceCtrl', function PanelProductsHostsNewController( $scope, $state, $stateParams, DS, Api, utils ) {
 
+		//Init Piece
+		$scope.portfolio = new Api('portfolio', {
+			//add this option incase the frontend needs to know if this is new
+			isNew: true
+		});
+
+		//Initiate this so it is bound to the entity that will be created
+		$scope.thisportfolio = $scope.portfolio.selected;
+		
+		//Create Piece
+		$scope.createPiece = function(pieceForm){
+			//Add all your attributes
+			var create = {
+				name: $scope.thispiece.name
+			};
+
+			$scope.portfolio.create(create)
+			.then(function(thisportfolio){
+				//redirect after the portfolio peice is created
+				$state.go('portofolio.view', {id: thisportfolio.id});
+			});
+		}
+
+	})
+	...
+```
+
+##Read Item example
 ```js
 	...
 	.controller( 'PortfolioPieceCtrl', function PortfolioPieceController( $scope, $stateParams DS, Api ) {
@@ -52,7 +85,7 @@ Allows pagination, filtering, and more!
 			}
 		});
 
-		//Set this so it's never empty
+		//Set this so it's never undefined
 		$scope.thisportfolio = $scope.portfolio.selected;
 
 		//Read from the Api
@@ -67,4 +100,65 @@ Allows pagination, filtering, and more!
 	...
 
 ```
+
+##Update Item example
+```js
+	...
+	.controller( 'PortfolioPieceCtrl', function PortfolioPieceController( $scope, $stateParams DS, Api ) {
+		
+		
+	})
+	...
+```
+
+##Delete Item example
+```js
+	...
+	.controller( 'PortfolioPieceCtrl', function PortfolioPieceController( $scope, $stateParams DS, Api ) {
+		
+		//Initiate the Api
+		$scope.portfolio = new Api('portfolio');
+
+
+
+		$scope.deletePiece = function(){
+			$scope.protfolio.delete($scope.thisportfolio)
+			.then(function(thisportfolio){
+				$state.go('portfolio');
+			});	
+		}
+	})
+	...
+```
+
+##Upload files example
+```js
+	...
+	.controller( 'PanelProductsCtrl', function PortfolioPieceController( $scope, $state, $stateParams, DS, Api, utils, $timeout ) {
+
+
+		//Imports
+		$scope.imports = new Api('portfolio',{
+			//Make an empty files array we can reference on the front end
+			files: [],
+			//Make the overall progress 0
+			progress: 0,
+			//Set the endpoint to the import controller
+			options: {
+				endpoint: '/portfolio/import'
+			}
+		});
+
+		//Call this when ready to import selected files
+		$scope.importFiles = function (importForm) {
+			$scope.imports.upload()
+			.then(function(files){
+				$scope.imports.progress = 0;
+				$scope.imports.files = [];
+			});
+		};
+	})
+	...
+```
+
 
