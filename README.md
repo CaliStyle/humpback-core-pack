@@ -12,7 +12,7 @@ from the database.
 Works with JS-data to make an easy and reusable resource system.
 Allows pagination, filtering, and more!
 
-##Search Example
+###Search Example
 ```js
 	...
 	.controller( 'PortfolioCtrl', function PortfolioController( $scope, DS, Api ) {
@@ -38,7 +38,7 @@ Allows pagination, filtering, and more!
 	})
 	...
 ```
-##Create Item example
+###Create Item example
 ```js
 	...
 	.controller( 'PortfolioPieceCtrl', function PanelProductsHostsNewController( $scope, $state, $stateParams, DS, Api, utils ) {
@@ -70,7 +70,7 @@ Allows pagination, filtering, and more!
 	...
 ```
 
-##Read Item example
+###Read Item example
 ```js
 	...
 	.controller( 'PortfolioPieceCtrl', function PortfolioPieceController( $scope, $stateParams DS, Api ) {
@@ -101,17 +101,50 @@ Allows pagination, filtering, and more!
 
 ```
 
-##Update Item example
+###Update Item example
 ```js
 	...
 	.controller( 'PortfolioPieceCtrl', function PortfolioPieceController( $scope, $stateParams DS, Api ) {
-		
+		//Initiate the Api
+		$scope.portfolio = new Api('portfolio', {
+			options: {
+				params: {
+					//Populate a collection
+					populate: 'images'
+				}
+			}
+		});
+
+		//Set this so it's never undefined
+		$scope.thisportfolio = $scope.portfolio.selected;
+
+		//Read from the Api
+		$scope.portfolio.read($stateParams.id)
+		.then(function(thisportfolio){
+			utils.development(thissku);
+		});
+
+		//Bind thisportfolio so that it updates from incoming sockets requests.
+		DS.bindOne('portfolio', $stateParams.id, $scope, 'thisportfolio');
+
+		$scope.updatePiece = function(){
+				
+			var update = {
+				id: $scope.thisportfolio.id,
+				name: $scope.thisportfolio.name
+			};
+
+			$scope.protfolio.update(update)
+			.then(function(thisportfolio){
+				$state.go('portfolio');
+			});	
+		}
 		
 	})
 	...
 ```
 
-##Delete Item example
+###Delete Item example
 ```js
 	...
 	.controller( 'PortfolioPieceCtrl', function PortfolioPieceController( $scope, $stateParams DS, Api ) {
@@ -131,7 +164,7 @@ Allows pagination, filtering, and more!
 	...
 ```
 
-##Upload files example
+###Upload files example
 ```js
 	...
 	.controller( 'PanelProductsCtrl', function PortfolioPieceController( $scope, $state, $stateParams, DS, Api, utils, $timeout ) {
