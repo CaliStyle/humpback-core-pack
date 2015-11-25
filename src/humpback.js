@@ -49,8 +49,6 @@ angular.module('humpback.core.cms', ['ui.router'])
             return;
         }
 
-        
-
         if(window._barnacles.cms){
             //Prevent the default Change until after the CMS resolves
             event.preventDefault();
@@ -58,14 +56,15 @@ angular.module('humpback.core.cms', ['ui.router'])
 
             $rootScope.__route.read(id)
             .then(function(thisroute){
-                
+                /*
                 if (!$rootScope.$broadcast('$stateChangeStart', toState, toParams, fromState, fromParams).defaultPrevented) {
+                    
                     //Set the page elements
                     $rootScope.__cms.setPage(thisroute);
                     //Set page URL for OG
                     $rootScope.__cms.setUrl($state.href(toState, toParams, {absolute: true}));
                 }
-
+                */
             })
             .catch(function(err){
                 
@@ -118,7 +117,6 @@ angular.module('humpback.core.cms', ['ui.router'])
                     return;
                 }
                 
-                
                 $rootScope.$broadcast('$stateChangeCmsAccepted', toState, toParams);
 
                 $state.go(toState.name, toParams, {notify: false})
@@ -136,6 +134,11 @@ angular.module('humpback.core.cms', ['ui.router'])
         window.prerenderReady = true;
         $rootScope.__currentState = toState.name;
         $rootScope.__currentParams = toParams;
+
+        //Set the page elements
+        $rootScope.__cms.setPage($rootScope.__route.selected);
+        //Set page URL for OG
+        $rootScope.__cms.setUrl($state.href(toState, toParams, {absolute: true}));
 
     });
 
@@ -871,7 +874,7 @@ angular.module('humpback.core.input', [])
 ;
 
 angular.module('humpback.core.api', [])
-.factory('Api', function(DS, utils, $location, $q, $sailsSocket, $timeout, Upload) {
+.factory('Api', function(DS, utils, $location, $state, $q, $sailsSocket, $timeout, Upload) {
 
   /*
    * Api
@@ -1138,7 +1141,9 @@ angular.module('humpback.core.api', [])
     api.end = api.skip + api.limit;
     api.page = api.page - 1 > 0 ? api.page - 1 : 1;
 
-    $location.search('page', api.page);
+    //$location.search('page', api.page);
+    $state.go('.', {'page': api.page}, {notify: false});
+
 
     return api.search(cb);
   }
@@ -1161,7 +1166,8 @@ angular.module('humpback.core.api', [])
     api.end = api.skip + api.limit;
     api.page = api.page + 1;
 
-    $location.search('page', api.page);
+    //$location.search('page', api.page);
+    $state.go('.', {'page': api.page}, {notify: false});
     
     return api.search(cb);
 
@@ -1191,7 +1197,8 @@ angular.module('humpback.core.api', [])
     api.start = api.skip;
     api.end = api.start + api.limit;
     
-    $location.search('page', page);
+    //$location.search('page', page);
+    $state.go('.', {'page': page}, {notify: false});
 
     return api.search(api.cb);
   };
@@ -1205,7 +1212,8 @@ angular.module('humpback.core.api', [])
     var api = this;
     if(type){
       //api[type] = typeof api[type] === 'object' ? JSON.stringify(api[type]) : api[type];
-      $location.search(type, api[type]);
+      //$location.search(type, api[type]);
+      $state.go('.', {type: api[type]}, {notify: false});
     }
     //Callback
     api.cb = cb || angular.noop;
@@ -1667,6 +1675,9 @@ angular.module('humpback.core.api', [])
 
         if(done === api.files.length){
             api.busy = false;
+            if(api.showAlert){
+                utils.alert({location: 'system-alerts', color: 'success', title: 'Upload Complete', content: 'File(s) Uploaded Successfully', autoclose: 2000});
+            }
             if(api.deferred){
                 api.deferred.resolve(api.files);
             }

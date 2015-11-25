@@ -2,7 +2,7 @@
 This is the component that initiates all the core frontend logic.
 
 ##Angular Humpack (humpbackSails.io.js)
-Connects to the humpback JS-data provder to make calls to the server. 
+Connects to the humpback JS-data provider to make calls to the server. 
 
 ##CMS
 Handles routing information and cacheing of server side templates
@@ -91,7 +91,7 @@ Allows pagination, filtering, and more!
 		//Read from the Api
 		$scope.portfolio.read($stateParams.id)
 		.then(function(thisportfolio){
-			utils.development(thissku);
+			utils.development(thisportfolio);
 		});
 
 		//Bind thisportfolio so that it updates from incoming sockets requests.
