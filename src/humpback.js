@@ -49,6 +49,8 @@ angular.module('humpback.core.cms', ['ui.router'])
             return;
         }
 
+        
+
         if(window._barnacles.cms){
             //Prevent the default Change until after the CMS resolves
             event.preventDefault();
@@ -56,15 +58,14 @@ angular.module('humpback.core.cms', ['ui.router'])
 
             $rootScope.__route.read(id)
             .then(function(thisroute){
-                /*
+                
                 if (!$rootScope.$broadcast('$stateChangeStart', toState, toParams, fromState, fromParams).defaultPrevented) {
-                    
                     //Set the page elements
                     $rootScope.__cms.setPage(thisroute);
                     //Set page URL for OG
                     $rootScope.__cms.setUrl($state.href(toState, toParams, {absolute: true}));
                 }
-                */
+
             })
             .catch(function(err){
                 
@@ -117,6 +118,7 @@ angular.module('humpback.core.cms', ['ui.router'])
                     return;
                 }
                 
+                
                 $rootScope.$broadcast('$stateChangeCmsAccepted', toState, toParams);
 
                 $state.go(toState.name, toParams, {notify: false})
@@ -134,11 +136,6 @@ angular.module('humpback.core.cms', ['ui.router'])
         window.prerenderReady = true;
         $rootScope.__currentState = toState.name;
         $rootScope.__currentParams = toParams;
-
-        //Set the page elements
-        $rootScope.__cms.setPage($rootScope.__route.selected);
-        //Set page URL for OG
-        $rootScope.__cms.setUrl($state.href(toState, toParams, {absolute: true}));
 
     });
 
@@ -732,9 +729,20 @@ angular.module('humpback.core.input', [])
 .directive('ngApiInput', ['$compile', function ($compile) {
     var getTemplate = function(model, type, collection) {
       
-      var required = '', 
-          disabled='',
-          unique='';
+    var required = '', 
+        disabled = '',
+        unique = '';
+
+    var booleanSelect = [
+        {
+            'id' : true,
+            'name' : 'True'
+        },
+        {
+            'id' : false,
+            'name' : 'False'
+        }
+    ];
 
       if(collection.required){
         required = ' required';
@@ -750,33 +758,32 @@ angular.module('humpback.core.input', [])
         
         case 'string': 
           return    '<label for="{{apiLabel}}">{{ apiLabel }}</label>'
-                  + '<input id="{{apiLabel}}" type="text" ng-model="apiInput"'+required+'>';
+                  + '<input id="{{apiLabel}}" type="text" class="api-'+type+'" ng-model="apiInput"'+required+'>';
 
         case 'text': 
           return    '<label for="{{apiLabel}}">{{ apiLabel }}</label>'
-                  + '<input id="{{apiLabel}}" type="text" ng-model="apiInput"'+required+'>';    
+                  + '<input id="{{apiLabel}}" type="text" class="api-'+type+'" ng-model="apiInput"'+required+'>';    
 
         case 'string-enum': 
           return    '<label for="{{apiLabel}}">{{ apiLabel }}</label>'
-                  + '<input id="{{apiLabel}}" type="text" ng-model="apiInput"'+required+'>';
+                  + '<input id="{{apiLabel}}" type="text" class="api-'+type+'" ng-model="apiInput"'+required+'>';
 
         case 'integer': 
           return    '<label for="{{apiLabel}}">{{ apiLabel }}</label>'
-                  + '<input id="{{apiLabel}}" type="number" ng-model="apiInput"'+required+'>';
+                  + '<input id="{{apiLabel}}" type="number" class="api-'+type+'" ng-model="apiInput"'+required+'>';
 
         case 'float': 
           return    '<label for="{{apiLabel}}">{{ apiLabel }}</label>'
-                  + '<input id="{{apiLabel}}" type="float" ng-model="apiInput"'+required+'>';
+                  + '<input id="{{apiLabel}}" type="float" class="api-'+type+'" ng-model="apiInput"'+required+'>';
         
         case 'email': 
           return    '<label for="{{apiLabel}}">{{ apiLabel }}</label>'
-                  + '<input id="{{apiLabel}}" type="email" ng-model="apiInput"'+required+'>';
+                  + '<input id="{{apiLabel}}" type="email" class="api-'+type+'" ng-model="apiInput"'+required+'>';
 
         case 'boolean': 
           return    '<label for="{{apiLabel}}">{{ apiLabel }}</label>'
-                  + '<select id="{{apiLabel}}" ng-model="apiInput">'
-                  +   '<option value="true">True</option>'
-                  +   '<option value="false">False</option>'
+                  + '<select id="{{apiLabel}}" ng-options="items.id as items.name for items in '+ booleanSelect +' ng-model="apiInput" class="api-'+type+'"'+required+'>'
+                  +   '<option> -- Select True or False -- </option>'
                   + '</select>';
 
         case 'date': 
@@ -1271,7 +1278,7 @@ angular.module('humpback.core.api', [])
 
   /*
    * Get model object from the API
-   * @param String endpoint
+   * @param String endpoint (optional)
    * @param Function cb (optional)
    */
 
@@ -1294,7 +1301,7 @@ angular.module('humpback.core.api', [])
     .success(function(data, status, headers, config){
             
         api.busy = false;  
-        if(data.id){
+        if(data.id && api.options.cacheResponse !== false){
             api.selected = DS.inject(api.resource, data);
         }else{
             api.selected = data;
@@ -1329,7 +1336,7 @@ angular.module('humpback.core.api', [])
 
   /*
    * Post model object to the API
-   * @param String id
+   * @param String endpoint (optional)
    * @param Function cb (optional)
    */
 
@@ -1352,13 +1359,126 @@ angular.module('humpback.core.api', [])
     .success(function(data, status, headers, config){
             
         api.busy = false;  
-        if(data.id){
+        if(data.id && api.options.cacheResponse !== false){
             api.selected = DS.inject(api.resource, data);
         }else{
             api.selected = data;
         }
         
 
+        //If is a promise
+        if(api.deferred){
+            api.deferred.resolve(api.selected);
+        }
+        return api.cb(null, api.selected);
+
+    })
+    .error(function(data, status, headers, config){
+        
+        api.busy = false;
+
+        api.error = status;
+        api.message = utils.handleError(data);
+
+        if(api.deferred){
+            api.deferred.reject(data);
+        }
+        return api.cb(data);
+    });
+    
+    if(api.deferred){
+      return api.deferred.promise;
+    }
+
+  }
+
+  /*
+   * Put model object to the API
+   * @param String endpoint (optional)
+   * @param Function cb (optional)
+   */
+
+  Api.prototype.put = function(endpoint, cb) {
+    var api = this;
+    
+    if (api.busy || api.updating){ 
+      return;
+    }
+    api.busy = true;
+
+    //Callback
+    api.cb = cb || angular.noop;
+    //Defered
+    api.deferred = typeof cb !== 'function' ? $q.defer() : null;
+    
+    var finalEndpoint = endpoint ? window._prefix + endpoint : window._prefix + api.options.endpoint; 
+    
+    $sailsSocket.put(finalEndpoint, api.selected)
+    .success(function(data, status, headers, config){
+            
+        api.busy = false;  
+        if(data.id && api.options.cacheResponse !== false){
+            api.selected = DS.inject(api.resource, data);
+        }else{
+            api.selected = data;
+        }
+        
+
+        //If is a promise
+        if(api.deferred){
+            api.deferred.resolve(api.selected);
+        }
+        return api.cb(null, api.selected);
+
+    })
+    .error(function(data, status, headers, config){
+        
+        api.busy = false;
+
+        api.error = status;
+        api.message = utils.handleError(data);
+
+        if(api.deferred){
+            api.deferred.reject(data);
+        }
+        return api.cb(data);
+    });
+    
+    if(api.deferred){
+      return api.deferred.promise;
+    }
+
+  }
+
+  /*
+   * Delete model object to the API
+   * @param String endpoint (optional)
+   * @param Function cb (optional)
+   */
+
+  Api.prototype.delete = function(endpoint, cb) {
+    var api = this;
+    
+    if (api.busy || api.updating){ 
+      return;
+    }
+    api.busy = true;
+
+    //Callback
+    api.cb = cb || angular.noop;
+    //Defered
+    api.deferred = typeof cb !== 'function' ? $q.defer() : null;
+    
+    var finalEndpoint = endpoint ? window._prefix + endpoint : window._prefix + api.options.endpoint; 
+    
+    $sailsSocket.delete(finalEndpoint, api.selected)
+    .success(function(data, status, headers, config){
+            
+        api.busy = false;  
+        if(data.id){
+            DS.eject(api.resource, data.id);
+        }
+        
         //If is a promise
         if(api.deferred){
             api.deferred.resolve(api.selected);
@@ -1576,12 +1696,12 @@ angular.module('humpback.core.api', [])
   }
 
   /*
-   * Delete model object through API
+   * Destroy model object through API
    * @param {Object} thisApi
    * @param Function cb (optional)
    */
 
-  Api.prototype.delete = function(thisApi, cb) {
+  Api.prototype.destroy = function(thisApi, cb) {
 
     var api = this;
     if (api.busy || api.updating || api.deleting){ 
@@ -1723,20 +1843,60 @@ angular.module('humpback.core.api', [])
 
   /* TODO
    * Add model association object through API
+   * @param {Object} thisApi
    * @param {Object} thisAssocApi
    * @param Function cb (optional)
    */
-  Api.prototype.add = function (thisAssocApi, cb) {
+  Api.prototype.add = function (thisApi, thisAssocApi, cb) {
+    var api = this;
+    
+    if (api.busy || api.updating){ 
+      return;
+    }
 
+    api.busy = true;
+    api.updating = true;
+
+    //Callback
+    api.cb = cb || angular.noop;
+    //Defered
+    api.deferred = typeof cb !== 'function' ? $q.defer() : null;
+
+    //TODO
+
+    //If is a promise
+    if(api.deferred){
+      return api.deferred.promise;
+    }
   }
 
   /* TODO
    * Remove model association object through API
+   * @param {Object} thisApi
    * @param {Object} thisAssocApi
    * @param Function cb (optional)
    */
-  Api.prototype.remove = function (thisAssocApi, cb) {
+  Api.prototype.remove = function (thisApi, thisAssocApi, cb) {
+    var api = this;
     
+    if (api.busy || api.updating){ 
+      return;
+    }
+
+    api.busy = true;
+    api.updating = true;
+
+    //Callback
+    api.cb = cb || angular.noop;
+    //Defered
+    api.deferred = typeof cb !== 'function' ? $q.defer() : null;
+
+    //TODO
+
+    //If is a promise
+    if(api.deferred){
+      return api.deferred.promise;
+    } 
   }
 
   return Api;

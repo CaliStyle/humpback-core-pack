@@ -5,7 +5,7 @@
     "Scott Wyatt <scottwyatt86@gmail.com>"
   ],
   "description": "Humpback Core Frontend Components",
-  "main": "index.js",
+  "main": "humpback.js",
   "keywords": [
     "Humpback",
     "frontend",
