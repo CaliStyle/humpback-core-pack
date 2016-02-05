@@ -782,7 +782,7 @@ angular.module('humpback.core.input', [])
 
         case 'boolean': 
           return    '<label for="{{apiLabel}}">{{ apiLabel }}</label>'
-                  + '<select id="{{apiLabel}}" ng-options="items.id as items.name for items in '+ booleanSelect +' ng-model="apiInput" class="api-'+type+'"'+required+'>'
+                  + '<select id="{{apiLabel}}" ng-options="item.id as item.name for item in '+ booleanSelect +' ng-model="apiInput" class="api-'+type+'"'+required+'>'
                   +   '<option> -- Select True or False -- </option>'
                   + '</select>';
 
@@ -973,6 +973,9 @@ angular.module('humpback.core.api', [])
     this.progress = 0;
     this.files = [];
 
+    //CONSTANTS
+    this._TIMEOUT = 100;
+
     for(var i in init){
       this[i] = init[i];
     }
@@ -1028,9 +1031,11 @@ angular.module('humpback.core.api', [])
   Api.prototype.search = function(cb) {
     var api = this, request;
     
-    if (api.busy){ 
-      return;
+    if(api.busy) {//we want it to wait
+        setTimeout(api.search(cb), api._TIMEOUT);//wait then recheck
+        return;
     }
+
     api.busy = true;
     request = api._buildRequest();
     
@@ -1090,10 +1095,17 @@ angular.module('humpback.core.api', [])
    */
   Api.prototype.init = function(cb) {
     var api = this;
+    /*
     if (api.busy){ 
       return;
     }
-
+    */
+    
+    if(api.busy) {//we want it to wait
+        setTimeout(api.init(cb), api._TIMEOUT);//wait then recheck
+        return;
+    }
+    
     //Callback
     api.cb = cb || angular.noop;
     //Defered
@@ -1104,6 +1116,7 @@ angular.module('humpback.core.api', [])
     api.page =  Math.ceil(api.start / api.limit) + 1;
     
     return api.search(cb);
+
   }
 
   /*
@@ -1135,8 +1148,9 @@ angular.module('humpback.core.api', [])
    */
   Api.prototype.prevPage = function(cb) {
     var api = this;
-    if (api.busy){ 
-      return;
+    if(api.busy) {//we want it to wait
+        setTimeout(api.prevPage(cb), api._TIMEOUT);//wait then recheck
+        return;
     }
     //Callback
     api.cb = cb || angular.noop;
@@ -1161,8 +1175,9 @@ angular.module('humpback.core.api', [])
    */
   Api.prototype.nextPage = function(cb) {
     var api = this;
-    if (api.busy){ 
-      return;
+    if(api.busy) {//we want it to wait
+        setTimeout(api.nextPage(cb), api._TIMEOUT);//wait then recheck
+        return;
     }
     //Callback
     api.cb = cb || angular.noop;
@@ -1191,8 +1206,9 @@ angular.module('humpback.core.api', [])
   Api.prototype.paging = function(text, page, pageSize, total, cb){
     
     var api = this;
-    if (api.busy){ 
-      return;
+    if(api.busy) {//we want it to wait
+        setTimeout(api.paging(text, page, pageSize, total, cb), api._TIMEOUT);//wait then recheck
+        return;
     }
     //Callback
     api.cb = cb || angular.noop;
@@ -1217,6 +1233,12 @@ angular.module('humpback.core.api', [])
    */
   Api.prototype.reset = function(type, cb) {
     var api = this;
+
+    if(api.busy) {//we want it to wait
+        setTimeout(api.reset(type, cb), api._TIMEOUT);//wait then recheck
+        return;
+    }    
+
     if(type){
       //api[type] = typeof api[type] === 'object' ? JSON.stringify(api[type]) : api[type];
       //$location.search(type, api[type]);
@@ -1227,7 +1249,7 @@ angular.module('humpback.core.api', [])
     //Defered
     api.deferred = typeof cb !== 'function' ? $q.defer() : null; 
     api.skip = 0;
-    api.init(cb); 
+    return api.init(cb); 
   }
 
   /**
@@ -1285,9 +1307,11 @@ angular.module('humpback.core.api', [])
   Api.prototype.get = function(endpoint, cb) {
     var api = this;
     
-    if (api.busy || api.updating){ 
-      return;
+    if(api.busy || api.updating) {//we want it to wait
+        setTimeout(api.get(endpoint, cb), api._TIMEOUT);//wait then recheck
+        return;
     }
+
     api.busy = true;
 
     //Callback
@@ -1343,9 +1367,11 @@ angular.module('humpback.core.api', [])
   Api.prototype.post = function(endpoint, cb) {
     var api = this;
     
-    if (api.busy || api.updating){ 
-      return;
+    if(api.busy || api.updating) {//we want it to wait
+        setTimeout(api.post(endpoint, cb), api._TIMEOUT);//wait then recheck
+        return;
     }
+
     api.busy = true;
 
     //Callback
@@ -1401,9 +1427,11 @@ angular.module('humpback.core.api', [])
   Api.prototype.put = function(endpoint, cb) {
     var api = this;
     
-    if (api.busy || api.updating){ 
-      return;
+    if(api.busy || api.updating) {//we want it to wait
+        setTimeout(api.put(endpoint, cb), api._TIMEOUT);//wait then recheck
+        return;
     }
+
     api.busy = true;
 
     //Callback
@@ -1459,9 +1487,11 @@ angular.module('humpback.core.api', [])
   Api.prototype.delete = function(endpoint, cb) {
     var api = this;
     
-    if (api.busy || api.updating){ 
-      return;
+    if(api.busy || api.updating) {//we want it to wait
+        setTimeout(api.delete(endpoint, cb), api._TIMEOUT);//wait then recheck
+        return;
     }
+
     api.busy = true;
 
     //Callback
@@ -1514,8 +1544,9 @@ angular.module('humpback.core.api', [])
   Api.prototype.read = function(id, cb) {
     var api = this;
     
-    if (api.busy || api.updating){ 
-      return;
+    if(api.busy || api.updating) {//we want it to wait
+        setTimeout(api.read(id, cb), api._TIMEOUT);//wait then recheck
+        return;
     }
     api.busy = true;
 
@@ -1563,8 +1594,9 @@ angular.module('humpback.core.api', [])
   Api.prototype.create = function(thisApi, cb) {
     var api = this;
     
-    if (api.busy || api.updating){ 
-      return;
+    if(api.busy || api.updating) {//we want it to wait
+        setTimeout(api.create(thisApi, cb), api._TIMEOUT);//wait then recheck
+        return;
     }
 
     api.busy = true;
@@ -1634,6 +1666,7 @@ angular.module('humpback.core.api', [])
   Api.prototype.update = function(thisApi, cb) {
     var api = this;
     if (api.busy || api.updating || api.deleting){ 
+      setTimeout(api.update(thisApi, cb), api._TIMEOUT);//wait then recheck
       return;
     }
     api.busy = true;
@@ -1705,6 +1738,7 @@ angular.module('humpback.core.api', [])
 
     var api = this;
     if (api.busy || api.updating || api.deleting){ 
+      setTimeout(api.destroy(thisApi, cb), api._TIMEOUT);//wait then recheck
       return;
     }
     //Set loading states
@@ -1764,11 +1798,17 @@ angular.module('humpback.core.api', [])
     }
   }
 
+  /*
+   * Uses ng-upload to upload files and report progress
+   * @param {String} endpoint (optional)
+   * @param {Function} cb (optional)
+   */
 
   Api.prototype.upload = function(endpoint, cb) {
     var api = this;
     
     if (api.busy || api.updating){ 
+      setTimeout(api.upload(endpoint, cb), api._TIMEOUT);//wait then recheck
       return;
     }
     api.busy = true;
@@ -1851,6 +1891,7 @@ angular.module('humpback.core.api', [])
     var api = this;
     
     if (api.busy || api.updating){ 
+      setTimeout(api.add(thisApi, thisAssocApi, cb), api._TIMEOUT);//wait then recheck
       return;
     }
 
@@ -1880,6 +1921,7 @@ angular.module('humpback.core.api', [])
     var api = this;
     
     if (api.busy || api.updating){ 
+      setTimeout(api.remove(thisApi, thisAssocApi, cb), api._TIMEOUT);//wait then recheck
       return;
     }
 
