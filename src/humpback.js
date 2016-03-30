@@ -1298,6 +1298,18 @@ angular.module('humpback.core.api', [])
   }
 
 
+    Api.prototype.wait = function(Callback) {
+        var api = this;
+       
+        if(api.busy || api.updating) {
+            setTimeout(function () {
+                api.wait(Callback)   // pass it in recursive calls 
+            }, api._TIMEOUT);
+        } else {
+            Callback();  // call it at the end of the loop
+        }
+    }
+
   /*
    * Get model object from the API
    * @param String endpoint (optional)
@@ -1307,50 +1319,54 @@ angular.module('humpback.core.api', [])
   Api.prototype.get = function(endpoint, cb) {
     var api = this;
     
-    if(api.busy || api.updating) {//we want it to wait
-        setTimeout(api.get(endpoint, cb), api._TIMEOUT);//wait then recheck
-        return;
-    }
 
-    api.busy = true;
+
+    // if(api.busy || api.updating) {//we want it to wait
+    //     setTimeout(api.get(endpoint, cb), api._TIMEOUT);//wait then recheck
+    //     return;
+    // }
 
     //Callback
     api.cb = cb || angular.noop;
     //Defered
     api.deferred = typeof cb !== 'function' ? $q.defer() : null;
     
-    var finalEndpoint = endpoint ? window._prefix + endpoint : window._prefix + api.options.endpoint; 
-    
-    $sailsSocket.get(finalEndpoint)
-    .success(function(data, status, headers, config){
-            
-        api.busy = false;  
-        if(data.id && api.options.cacheResponse !== false){
-            api.selected = DS.inject(api.resource, data);
-        }else{
-            api.selected = data;
-        }
+    api.wait(function() {  
 
-        //If is a promise
-        if(api.deferred){
-            api.deferred.resolve(api.selected);
-        }
-        return api.cb(null, api.selected);
-
-    })
-    .error(function(data, status, headers, config){
+        api.busy = true;
         
-        api.busy = false;
+        var finalEndpoint = endpoint ? window._prefix + endpoint : window._prefix + api.options.endpoint; 
+        
+        $sailsSocket.get(finalEndpoint)
+        .success(function(data, status, headers, config){
+                
+            api.busy = false;  
+            if(data.id && api.options.cacheResponse !== false){
+                api.selected = DS.inject(api.resource, data);
+            }else{
+                api.selected = data;
+            }
 
-        api.error = status;
-        api.message = utils.handleError(data);
+            //If is a promise
+            if(api.deferred){
+                api.deferred.resolve(api.selected);
+            }
+            return api.cb(null, api.selected);
 
-        if(api.deferred){
-            api.deferred.reject(data);
-        }
-        return api.cb(data);
+        })
+        .error(function(data, status, headers, config){
+            
+            api.busy = false;
+
+            api.error = status;
+            api.message = utils.handleError(data);
+
+            if(api.deferred){
+                api.deferred.reject(data);
+            }
+            return api.cb(data);
+        });
     });
-    
     if(api.deferred){
       return api.deferred.promise;
     }
@@ -1367,51 +1383,55 @@ angular.module('humpback.core.api', [])
   Api.prototype.post = function(endpoint, cb) {
     var api = this;
     
-    if(api.busy || api.updating) {//we want it to wait
-        setTimeout(api.post(endpoint, cb), api._TIMEOUT);//wait then recheck
-        return;
-    }
-
-    api.busy = true;
-
+    // if(api.busy || api.updating) {//we want it to wait
+    //     setTimeout(api.post(endpoint, cb), api._TIMEOUT);//wait then recheck
+    //     return;
+    // }
     //Callback
     api.cb = cb || angular.noop;
     //Defered
     api.deferred = typeof cb !== 'function' ? $q.defer() : null;
-    
-    var finalEndpoint = endpoint ? window._prefix + endpoint : window._prefix + api.options.endpoint; 
-    
-    $sailsSocket.post(finalEndpoint, api.selected)
-    .success(function(data, status, headers, config){
+
+    api.wait(function() { 
+
+        api.busy = true;
+
+        
+        
+        var finalEndpoint = endpoint ? window._prefix + endpoint : window._prefix + api.options.endpoint; 
+        
+        $sailsSocket.post(finalEndpoint, api.selected)
+        .success(function(data, status, headers, config){
+                
+            api.busy = false;  
+            if(data.id && api.options.cacheResponse !== false){
+                api.selected = DS.inject(api.resource, data);
+            }else{
+                api.selected = data;
+            }
             
-        api.busy = false;  
-        if(data.id && api.options.cacheResponse !== false){
-            api.selected = DS.inject(api.resource, data);
-        }else{
-            api.selected = data;
-        }
+
+            //If is a promise
+            if(api.deferred){
+                api.deferred.resolve(api.selected);
+            }
+            return api.cb(null, api.selected);
+
+        })
+        .error(function(data, status, headers, config){
+            
+            api.busy = false;
+
+            api.error = status;
+            api.message = utils.handleError(data);
+
+            if(api.deferred){
+                api.deferred.reject(data);
+            }
+            return api.cb(data);
+        });
         
-
-        //If is a promise
-        if(api.deferred){
-            api.deferred.resolve(api.selected);
-        }
-        return api.cb(null, api.selected);
-
-    })
-    .error(function(data, status, headers, config){
-        
-        api.busy = false;
-
-        api.error = status;
-        api.message = utils.handleError(data);
-
-        if(api.deferred){
-            api.deferred.reject(data);
-        }
-        return api.cb(data);
     });
-    
     if(api.deferred){
       return api.deferred.promise;
     }
@@ -1427,51 +1447,53 @@ angular.module('humpback.core.api', [])
   Api.prototype.put = function(endpoint, cb) {
     var api = this;
     
-    if(api.busy || api.updating) {//we want it to wait
-        setTimeout(api.put(endpoint, cb), api._TIMEOUT);//wait then recheck
-        return;
-    }
-
-    api.busy = true;
-
+    // if(api.busy || api.updating) {//we want it to wait
+    //     setTimeout(api.put(endpoint, cb), api._TIMEOUT);//wait then recheck
+    //     return;
+    // }
     //Callback
     api.cb = cb || angular.noop;
     //Defered
     api.deferred = typeof cb !== 'function' ? $q.defer() : null;
-    
-    var finalEndpoint = endpoint ? window._prefix + endpoint : window._prefix + api.options.endpoint; 
-    
-    $sailsSocket.put(finalEndpoint, api.selected)
-    .success(function(data, status, headers, config){
+
+    api.wait(function() { 
+
+        api.busy = true;    
+        
+        var finalEndpoint = endpoint ? window._prefix + endpoint : window._prefix + api.options.endpoint; 
+        
+        $sailsSocket.put(finalEndpoint, api.selected)
+        .success(function(data, status, headers, config){
+                
+            api.busy = false;  
+            if(data.id && api.options.cacheResponse !== false){
+                api.selected = DS.inject(api.resource, data);
+            }else{
+                api.selected = data;
+            }
             
-        api.busy = false;  
-        if(data.id && api.options.cacheResponse !== false){
-            api.selected = DS.inject(api.resource, data);
-        }else{
-            api.selected = data;
-        }
+
+            //If is a promise
+            if(api.deferred){
+                api.deferred.resolve(api.selected);
+            }
+            return api.cb(null, api.selected);
+
+        })
+        .error(function(data, status, headers, config){
+            
+            api.busy = false;
+
+            api.error = status;
+            api.message = utils.handleError(data);
+
+            if(api.deferred){
+                api.deferred.reject(data);
+            }
+            return api.cb(data);
+        });
         
-
-        //If is a promise
-        if(api.deferred){
-            api.deferred.resolve(api.selected);
-        }
-        return api.cb(null, api.selected);
-
-    })
-    .error(function(data, status, headers, config){
-        
-        api.busy = false;
-
-        api.error = status;
-        api.message = utils.handleError(data);
-
-        if(api.deferred){
-            api.deferred.reject(data);
-        }
-        return api.cb(data);
     });
-    
     if(api.deferred){
       return api.deferred.promise;
     }
@@ -1487,48 +1509,50 @@ angular.module('humpback.core.api', [])
   Api.prototype.delete = function(endpoint, cb) {
     var api = this;
     
-    if(api.busy || api.updating) {//we want it to wait
-        setTimeout(api.delete(endpoint, cb), api._TIMEOUT);//wait then recheck
-        return;
-    }
-
-    api.busy = true;
-
+    // if(api.busy || api.updating) {//we want it to wait
+    //     setTimeout(api.delete(endpoint, cb), api._TIMEOUT);//wait then recheck
+    //     return;
+    // }
     //Callback
     api.cb = cb || angular.noop;
     //Defered
     api.deferred = typeof cb !== 'function' ? $q.defer() : null;
-    
-    var finalEndpoint = endpoint ? window._prefix + endpoint : window._prefix + api.options.endpoint; 
-    
-    $sailsSocket.delete(finalEndpoint, api.selected)
-    .success(function(data, status, headers, config){
+
+    api.wait(function() { 
+        api.busy = true;
+        
+        var finalEndpoint = endpoint ? window._prefix + endpoint : window._prefix + api.options.endpoint; 
+        
+        $sailsSocket.delete(finalEndpoint, api.selected)
+        .success(function(data, status, headers, config){
+                
+            api.busy = false;  
+            if(data.id){
+                DS.eject(api.resource, data.id);
+            }
             
-        api.busy = false;  
-        if(data.id){
-            DS.eject(api.resource, data.id);
-        }
+            //If is a promise
+            if(api.deferred){
+                api.deferred.resolve(api.selected);
+            }
+            return api.cb(null, api.selected);
+
+        })
+        .error(function(data, status, headers, config){
+            
+            api.busy = false;
+
+            api.error = status;
+            api.message = utils.handleError(data);
+
+            if(api.deferred){
+                api.deferred.reject(data);
+            }
+            return api.cb(data);
+        });
         
-        //If is a promise
-        if(api.deferred){
-            api.deferred.resolve(api.selected);
-        }
-        return api.cb(null, api.selected);
-
-    })
-    .error(function(data, status, headers, config){
-        
-        api.busy = false;
-
-        api.error = status;
-        api.message = utils.handleError(data);
-
-        if(api.deferred){
-            api.deferred.reject(data);
-        }
-        return api.cb(data);
     });
-    
+
     if(api.deferred){
       return api.deferred.promise;
     }
@@ -1544,40 +1568,44 @@ angular.module('humpback.core.api', [])
   Api.prototype.read = function(id, cb) {
     var api = this;
     
-    if(api.busy || api.updating) {//we want it to wait
-        setTimeout(api.read(id, cb), api._TIMEOUT);//wait then recheck
-        return;
-    }
-    api.busy = true;
-
+    // if(api.busy || api.updating) {//we want it to wait
+    //     setTimeout(api.read(id, cb), api._TIMEOUT);//wait then recheck
+    //     return;
+    // }
     //Callback
     api.cb = cb || angular.noop;
     //Defered
     api.deferred = typeof cb !== 'function' ? $q.defer() : null; 
 
-    DS.find(api.resource, id, api.options)
-    .then(function(thisApi){
-      //Set selected Model
-      api.selected = thisApi;
+    api.wait(function() { 
+        api.busy = true;
 
-      //If is a promise
-      if(api.deferred){
-        api.deferred.resolve(api.selected);
-      }
-      return api.cb(null, api.selected);
+        
 
-    })
-    .finally(function () {
-      api.busy = false;
-    })
-    .catch(function(err){
-      api.error = err.status;
-      api.message = utils.handleError(err);
+        DS.find(api.resource, id, api.options)
+        .then(function(thisApi){
+          //Set selected Model
+          api.selected = thisApi;
 
-      if(api.deferred){
-        api.deferred.reject(err);
-      }
-      return api.cb(err);
+          //If is a promise
+          if(api.deferred){
+            api.deferred.resolve(api.selected);
+          }
+          return api.cb(null, api.selected);
+
+        })
+        .finally(function () {
+          api.busy = false;
+        })
+        .catch(function(err){
+          api.error = err.status;
+          api.message = utils.handleError(err);
+
+          if(api.deferred){
+            api.deferred.reject(err);
+          }
+          return api.cb(err);
+        });
     });
 
     if(api.deferred){
@@ -1594,63 +1622,64 @@ angular.module('humpback.core.api', [])
   Api.prototype.create = function(thisApi, cb) {
     var api = this;
     
-    if(api.busy || api.updating) {//we want it to wait
-        setTimeout(api.create(thisApi, cb), api._TIMEOUT);//wait then recheck
-        return;
-    }
-
-    api.busy = true;
-    api.updating = true;
-
+    // if(api.busy || api.updating) {//we want it to wait
+    //     setTimeout(api.create(thisApi, cb), api._TIMEOUT);//wait then recheck
+    //     return;
+    // }
     //Callback
     api.cb = cb || angular.noop;
     //Defered
     api.deferred = typeof cb !== 'function' ? $q.defer() : null; 
 
-    DS.create(api.resource, thisApi, api.options)
-    .then(function(thisApi){
-      //Set the selected model
-      api.selected = thisApi;
-      
-      //Show site-alert
-      if(api.showAlert){
-        utils.alert({location: 'system-alerts', color: 'success', title: api.resource, content: 'Created Successfully', autoclose: 2000});
-      }
+    api.wait(function() { 
+        api.busy = true;
+        api.updating = true;
 
-      //Reset error and message to null
-      api.error = null;
-      api.message = null;
+        DS.create(api.resource, thisApi, api.options)
+        .then(function(thisApi){
+          //Set the selected model
+          api.selected = thisApi;
+          
+          //Show site-alert
+          if(api.showAlert){
+            utils.alert({location: 'system-alerts', color: 'success', title: api.resource, content: 'Created Successfully', autoclose: 2000});
+          }
 
-      //if is a promise
-      if(api.deferred){
-        api.deferred.resolve(api.selected);
-      }
-      //if is a callback
-      return api.cb(null, api.selected);
+          //Reset error and message to null
+          api.error = null;
+          api.message = null;
 
-    })
-    .finally(function () {
-      //reset loading states
-      api.busy = false;
-      api.updating = false;
-    })
-    .catch(function(err){
-      //set error
-      api.error = err.status;
-      api.message = utils.handleError(err);
-      
-      //show site-alert
-      if(api.showAlert){
-        utils.alert({location: 'system-alerts', color: 'error', title: api.resource, content: 'Error Creating', autoclose: 2000});
-      }
-      //If is a promise
-      if(api.deferred){
-        api.deferred.reject(err);
-      }
-      //if is a callback
-      return api.cb(err);
+          //if is a promise
+          if(api.deferred){
+            api.deferred.resolve(api.selected);
+          }
+          //if is a callback
+          return api.cb(null, api.selected);
+
+        })
+        .finally(function () {
+          //reset loading states
+          api.busy = false;
+          api.updating = false;
+        })
+        .catch(function(err){
+          //set error
+          api.error = err.status;
+          api.message = utils.handleError(err);
+          
+          //show site-alert
+          if(api.showAlert){
+            utils.alert({location: 'system-alerts', color: 'error', title: api.resource, content: 'Error Creating', autoclose: 2000});
+          }
+          //If is a promise
+          if(api.deferred){
+            api.deferred.reject(err);
+          }
+          //if is a callback
+          return api.cb(err);
+        });
+    
     });
-
     //if is a promise
     if(api.deferred){
       return api.deferred.promise;
@@ -1665,63 +1694,68 @@ angular.module('humpback.core.api', [])
 
   Api.prototype.update = function(thisApi, cb) {
     var api = this;
-    if (api.busy || api.updating || api.deleting){ 
-      setTimeout(api.update(thisApi, cb), api._TIMEOUT);//wait then recheck
-      return;
-    }
-    api.busy = true;
-    api.updating = true;
+    // if (api.busy || api.updating || api.deleting){ 
+    //   setTimeout(api.update(thisApi, cb), api._TIMEOUT);//wait then recheck
+    //   return;
+    // }
 
     //Callback
     api.cb = cb || angular.noop;
     //Defered
-    api.deferred = typeof cb !== 'function' ? $q.defer() : null; 
+    api.deferred = typeof cb !== 'function' ? $q.defer() : null;
 
-    DS.update(api.resource, thisApi.id, thisApi, api.options)
-    .then(function(thisApi){
+    api.wait(function() { 
+        api.busy = true;
+        api.updating = true;
 
-      //Set the selected model
-      api.selected = thisApi;
-      
-      //show site-alert
-      if(api.showAlert){
-        utils.alert({location: 'system-alerts', color: 'success', title: api.resource, content: 'Updated Successfully', autoclose: 2000});
-      }
+         
 
-      //reset error and message to null
-      api.error = null;
-      api.message = null;
+        DS.update(api.resource, thisApi.id, thisApi, api.options)
+        .then(function(thisApi){
 
-      //If is a promise
-      if(api.deferred){
-        api.deferred.resolve(thisApi);
-      }
-      //If is a callback
-      return api.cb(null, api.selected);
+          //Set the selected model
+          api.selected = thisApi;
+          
+          //show site-alert
+          if(api.showAlert){
+            utils.alert({location: 'system-alerts', color: 'success', title: api.resource, content: 'Updated Successfully', autoclose: 2000});
+          }
 
-    })
-    .finally(function () {
-      //Reset the loading state
-      api.busy = false;
-      api.updating = false;
-    })
-    .catch(function(err){
-      //Set error
-      api.error = err.status;
-      api.message = utils.handleError(err);
-      
-      //Show site-alert
-      if(api.showAlert){
-        utils.alert({location: 'system-alerts', color: 'error', title: api.resource, content: 'Error Updating', autoclose: 2000});
-      }
-      //If is a promise
-      if(api.deferred){
-        api.deferred.reject(err);
-      }
-      //If is a callback
-      return api.cb(err);
+          //reset error and message to null
+          api.error = null;
+          api.message = null;
+
+          //If is a promise
+          if(api.deferred){
+            api.deferred.resolve(thisApi);
+          }
+          //If is a callback
+          return api.cb(null, api.selected);
+
+        })
+        .finally(function () {
+          //Reset the loading state
+          api.busy = false;
+          api.updating = false;
+        })
+        .catch(function(err){
+          //Set error
+          api.error = err.status;
+          api.message = utils.handleError(err);
+          
+          //Show site-alert
+          if(api.showAlert){
+            utils.alert({location: 'system-alerts', color: 'error', title: api.resource, content: 'Error Updating', autoclose: 2000});
+          }
+          //If is a promise
+          if(api.deferred){
+            api.deferred.reject(err);
+          }
+          //If is a callback
+          return api.cb(err);
+        });
+    
     });
-
     //If is a promise
     if(api.deferred){
       return api.deferred.promise;
@@ -1737,61 +1771,67 @@ angular.module('humpback.core.api', [])
   Api.prototype.destroy = function(thisApi, cb) {
 
     var api = this;
-    if (api.busy || api.updating || api.deleting){ 
-      setTimeout(api.destroy(thisApi, cb), api._TIMEOUT);//wait then recheck
-      return;
-    }
-    //Set loading states
-    api.busy = true;
-    api.deleting = true;
-
+    // if (api.busy || api.updating || api.deleting){ 
+    //   setTimeout(api.destroy(thisApi, cb), api._TIMEOUT);//wait then recheck
+    //   return;
+    // }
     //Callback
     api.cb = cb || angular.noop;
     //Defered
     api.deferred = typeof cb !== 'function' ? $q.defer() : null; 
 
-    DS.destroy(api.resource, thisApi.id, api.options)
-    .then(function(thisApi){
-      //Unset selected model
-      api.selected = {};
-      
-      //Show site-alert
-      if(api.showAlert){
-        utils.alert({location: 'system-alerts', color: 'success', title: api.resource, content: 'Deleted Successfully', autoclose: 2000});
-      }
-      //Reset error and message to null
-      api.error = null;
-      api.message = null;
+    api.wait(function() { 
 
-      //If is a promise
-      if(api.deferred){
-        api.deferred.resolve(api.selected);
-      }
-      //If is a callback
-      return api.cb(null, api.selected);
-    })
-    .finally(function () {
-      //Reset loading states
-      api.busy = false;
-      api.deleting = false;
-    })
-    .catch(function(err){
-      //Set error
-      api.error = err.status;
-      api.message = utils.handleError(err);
-      
-      //Show site-alert
-      if(api.showAlert){
-        utils.alert({location: 'system-alerts', color: 'error', title: api.resource, content: 'Error Deleting', autoclose: 2000});
-      }
-      //If is a promise
-      if(api.deferred){
-        api.deferred.reject(err);
-      }
-      //If is a callback
-      return api.cb(err);
+        //Set loading states
+        api.busy = true;
+        api.deleting = true;
+
+        
+
+        DS.destroy(api.resource, thisApi.id, api.options)
+        .then(function(thisApi){
+          //Unset selected model
+          api.selected = {};
+          
+          //Show site-alert
+          if(api.showAlert){
+            utils.alert({location: 'system-alerts', color: 'success', title: api.resource, content: 'Deleted Successfully', autoclose: 2000});
+          }
+          //Reset error and message to null
+          api.error = null;
+          api.message = null;
+
+          //If is a promise
+          if(api.deferred){
+            api.deferred.resolve(api.selected);
+          }
+          //If is a callback
+          return api.cb(null, api.selected);
+        })
+        .finally(function () {
+          //Reset loading states
+          api.busy = false;
+          api.deleting = false;
+        })
+        .catch(function(err){
+          //Set error
+          api.error = err.status;
+          api.message = utils.handleError(err);
+          
+          //Show site-alert
+          if(api.showAlert){
+            utils.alert({location: 'system-alerts', color: 'error', title: api.resource, content: 'Error Deleting', autoclose: 2000});
+          }
+          //If is a promise
+          if(api.deferred){
+            api.deferred.reject(err);
+          }
+          //If is a callback
+          return api.cb(err);
+        });
+
+        
     });
-
     //If is a promise
     if(api.deferred){
       return api.deferred.promise;
@@ -1807,74 +1847,80 @@ angular.module('humpback.core.api', [])
   Api.prototype.upload = function(endpoint, cb) {
     var api = this;
     
-    if (api.busy || api.updating){ 
-      setTimeout(api.upload(endpoint, cb), api._TIMEOUT);//wait then recheck
-      return;
-    }
-    api.busy = true;
-
+    // if (api.busy || api.updating){ 
+    //   setTimeout(api.upload(endpoint, cb), api._TIMEOUT);//wait then recheck
+    //   return;
+    // }
     //Callback
     api.cb = cb || angular.noop;
     //Defered
     api.deferred = typeof cb !== 'function' ? $q.defer() : null;
-    
-    var finalEndpoint = endpoint ? window._prefix + endpoint : window._prefix + api.options.endpoint; 
-    
-    var progress = function(){
-        var done = 0;
-        var progress = 0;
+
+    api.wait(function() { 
+        api.busy = true;
+
         
-        for (var i = 0; i < api.files.length; i++) {
-            var file = api.files[i];
-            if(file.$complete){
-                done = done + 1;
+        
+        var finalEndpoint = endpoint ? window._prefix + endpoint : window._prefix + api.options.endpoint; 
+        
+        var progress = function(){
+            var done = 0;
+            var progress = 0;
+            
+            for (var i = 0; i < api.files.length; i++) {
+                var file = api.files[i];
+                if(file.$complete){
+                    done = done + 1;
+                }
+                progress = progress + file.$progressPercentage;
             }
-            progress = progress + file.$progressPercentage;
+            api.progress = progress / api.files.length;
+
+            if(done === api.files.length){
+                api.busy = false;
+                if(api.showAlert){
+                    utils.alert({location: 'system-alerts', color: 'success', title: 'Upload Complete', content: 'File(s) Uploaded Successfully', autoclose: 2000});
+                }
+                if(api.deferred){
+                    api.deferred.resolve(api.files);
+                }
+                return api.cb(null, api.files);
+            }
         }
-        api.progress = progress / api.files.length;
-
-        if(done === api.files.length){
-            api.busy = false;
-            if(api.showAlert){
-                utils.alert({location: 'system-alerts', color: 'success', title: 'Upload Complete', content: 'File(s) Uploaded Successfully', autoclose: 2000});
-            }
-            if(api.deferred){
-                api.deferred.resolve(api.files);
-            }
-            return api.cb(null, api.files);
-        }
-    }
 
 
-    if (api.files && api.files.length) {
-        for (var i = 0; i < api.files.length; i++) {
-            var file = api.files[i];
-            console.log(file);
-            if (!file.$error) {
-                Upload.upload({
-                    url: finalEndpoint,
-                    data: {
-                        file: file  
-                    }
-                })
-                .progress(function (evt) {
-                    file.$progressPercentage = parseInt(100.0 * evt.loaded / evt.total);
-                    file.$log = 'progress: ' + file.$progressPercentage + '% ' + evt.config.data.file.name + '\n' + file.$log;
-                    file.$complete = false;
-                    progress();
-                })
-                .success(function (data, status, headers, config) {
-                    $timeout(function() {
-                        file.$progressPercentage = 100;
-                        file.$log = 'file: ' + config.data.file.name + ', Response: ' + JSON.stringify(data) + '\n' + file.$log;
-                        file.$complete = true;
+        if (api.files && api.files.length) {
+            for (var i = 0; i < api.files.length; i++) {
+                var file = api.files[i];
+                console.log(file);
+                if (!file.$error) {
+                    Upload.upload({
+                        url: finalEndpoint,
+                        data: {
+                            file: file  
+                        }
+                    })
+                    .progress(function (evt) {
+                        file.$progressPercentage = parseInt(100.0 * evt.loaded / evt.total);
+                        file.$log = 'progress: ' + file.$progressPercentage + '% ' + evt.config.data.file.name + '\n' + file.$log;
+                        file.$complete = false;
                         progress();
+                    })
+                    .success(function (data, status, headers, config) {
+                        $timeout(function() {
+                            file.$progressPercentage = 100;
+                            file.$log = 'file: ' + config.data.file.name + ', Response: ' + JSON.stringify(data) + '\n' + file.$log;
+                            file.$complete = true;
+                            progress();
+                        });
                     });
-                });
+                }
             }
         }
-    }
-    
+        
+        
+    });
+
     if(api.deferred){
       return api.deferred.promise;
     }
@@ -1890,25 +1936,27 @@ angular.module('humpback.core.api', [])
   Api.prototype.add = function (thisApi, thisAssocApi, cb) {
     var api = this;
     
-    if (api.busy || api.updating){ 
-      setTimeout(api.add(thisApi, thisAssocApi, cb), api._TIMEOUT);//wait then recheck
-      return;
-    }
-
-    api.busy = true;
-    api.updating = true;
+    // if (api.busy || api.updating){ 
+    //   setTimeout(api.add(thisApi, thisAssocApi, cb), api._TIMEOUT);//wait then recheck
+    //   return;
+    // }
 
     //Callback
     api.cb = cb || angular.noop;
     //Defered
     api.deferred = typeof cb !== 'function' ? $q.defer() : null;
 
-    //TODO
+    api.wait(function() { 
+        api.busy = true;
+        api.updating = true;
+        //TODO
 
+    });
     //If is a promise
     if(api.deferred){
       return api.deferred.promise;
     }
+    
   }
 
   /* TODO
@@ -1920,21 +1968,27 @@ angular.module('humpback.core.api', [])
   Api.prototype.remove = function (thisApi, thisAssocApi, cb) {
     var api = this;
     
-    if (api.busy || api.updating){ 
-      setTimeout(api.remove(thisApi, thisAssocApi, cb), api._TIMEOUT);//wait then recheck
-      return;
-    }
-
-    api.busy = true;
-    api.updating = true;
+    // if (api.busy || api.updating){ 
+    //   setTimeout(api.remove(thisApi, thisAssocApi, cb), api._TIMEOUT);//wait then recheck
+    //   return;
+    // }
 
     //Callback
     api.cb = cb || angular.noop;
     //Defered
     api.deferred = typeof cb !== 'function' ? $q.defer() : null;
 
-    //TODO
+    api.wait(function() { 
 
+        api.busy = true;
+        api.updating = true;
+
+        
+
+        //TODO
+
+        
+    });
     //If is a promise
     if(api.deferred){
       return api.deferred.promise;
