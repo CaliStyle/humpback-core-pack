@@ -958,10 +958,10 @@ angular.module('humpback.core.api', [])
     this.filter = ['',''];
 
     //Sort this.visible
-    this.sort = 'createdAt ASC';
+    this.sort = 'createdAt DESC';
     
     //Angular sort this.visible (Auto Resolves)
-    this.angularSort = '-createdAt';
+    this.angularSort = 'createdAt';
 
     //Api error codes
     this.error = null;
