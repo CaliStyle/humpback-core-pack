@@ -961,7 +961,7 @@ angular.module('humpback.core.api', [])
     this.sort = 'createdAt DESC';
     
     //Angular sort this.visible (Auto Resolves)
-    this.angularSort = 'createdAt';
+    this.angularSort = '-createdAt';
 
     //Api error codes
     this.error = null;
@@ -997,9 +997,9 @@ angular.module('humpback.core.api', [])
 
       part1 = sortPieces[0];
       if(sortPieces[1] === 'DESC'){
-        part2 = '';
-      }else if (sortPieces[1] === 'ASC'){
         part2 = '-';
+      }else if (sortPieces[1] === 'ASC'){
+        part2 = '';
       }
       return api.angularSort = part2+part1;
   };
