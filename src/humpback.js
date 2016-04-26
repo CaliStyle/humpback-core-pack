@@ -38,7 +38,8 @@ angular.module('humpback.core.cms', ['ui.router'])
     $rootScope.$on('$stateChangeStart',function (event, toState, toParams, fromState, fromParams) {
         
         var addr = $state.href(toState, toParams, {absolute: false}),
-            id = btoa('get:' + addr),
+            
+            id = btoa('get:' + addr.split(/[?#]/)[0]),
             cont = true,
             redirectTo = false;
 
