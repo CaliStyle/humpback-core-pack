@@ -951,7 +951,7 @@ angular.module('humpback.core.api', [])
     this.end = 10;
 
     //If this is triggered by infinite scrolling
-    this.infinite = false;
+    this.isInfinite = false;
     
     //Criteria to search for 
     this.criteria = {};
@@ -1053,7 +1053,7 @@ angular.module('humpback.core.api', [])
       //console.log(DS.definitions[api.resource].meta.contentCount);
 
       api.api = _.union(api.api, list);
-      if(api.options.useFilter || !api.infinite){
+      if(api.options.useFilter || !api.isInfinite){
         api.visible = list;
       }else{
         api.visible = _.slice(api.api, api.start, api.end);  
@@ -1130,8 +1130,10 @@ angular.module('humpback.core.api', [])
    */
   Api.prototype.infinite = function(cb) {
     var api = this;
-    if (api.busy){ 
-      return;
+    
+    if(api.busy) {//we want it to wait
+        setTimeout(api.infinite(cb), api._TIMEOUT);//wait then recheck
+        return;
     }
 
     //Callback
@@ -1139,7 +1141,7 @@ angular.module('humpback.core.api', [])
     //Defered
     api.deferred = typeof cb !== 'function' ? $q.defer() : null; 
 
-    api.infinite = true;
+    api.isInfinite = true;
     api.start = 0;
     api.end = api.skip + api.limit;
     
